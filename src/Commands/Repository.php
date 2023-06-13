@@ -118,7 +118,7 @@ class Repository extends Command
 
     /**
      * Rewrite actually the content in the file.
-     *
+     * @param null $module
      * @param $filename
      * @param $content
      */
@@ -169,13 +169,10 @@ class Repository extends Command
     protected function modelFileExists($model, $module = null)
     {
         if (is_null($module)) {
-            $this->output->info('dont check module');
-
             return file_exists( base_path(lcfirst($model).'.php')) || file_exists( base_path(lcfirst(str_replace('\\', '/', $model)).'.php'));
         }
 
         $path = base_path('Modules/'.ucfirst($module).'/Entities/'.lcfirst($model).'.php');
-        $this->output->info('check module path '. $path);
         return file_exists($path) || file_exists('Modules/'.base_path(ucfirst($module).'/Entities/'.lcfirst(str_replace('\\', '/', $model)).'.php'));
     }
 
@@ -241,7 +238,6 @@ class Repository extends Command
                 } else {
                     if ($this->moduleExists(ucfirst($module))) {
                         if ($this->modelFileExists($model, $module)) {
-                            $path = base_path('Modules/'.ucfirst($module).'/Entities/'.lcfirst($model).'.php');
                             $modelNameSpace = 'Modules\\'.$module.'\\Entities';
                             $namespace = 'Modules\\'.$module.'\\Repositories';
                             $content = $this->replaceNamespace($namespace, $this->getStub());
