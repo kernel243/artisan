@@ -1,0 +1,34 @@
+<?php
+
+namespace Kernel243\Artisan;
+
+use Illuminate\Support\ServiceProvider;
+use Kernel243\Artisan\Commands\Repository;
+
+class CommandServiceProvider extends ServiceProvider {
+
+    /**
+     * Bootstrap the application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                Repository::class,
+            ]);
+        }
+    }
+
+    /**
+     * Register the application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        //
+    }
+
+}

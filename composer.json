@@ -8,6 +8,13 @@
             "Kernel243\\Artisan\\": "src/"
         }
     },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Kernel243\\Artisan\\CommandServiceProvider"
+            ]
+        }
+    },
     "authors": [
         {
             "name": "merdi elongo",
