@@ -1,0 +1,22 @@
+{
+    "name": "kernel243/artisan",
+    "description": "This package provides a set of artisan commands for Laravel",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Kernel243\\Artisan\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "merdi elongo",
+            "email": "merdielongo9@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": ">=7.4.0",
+        "laravel/framework": ">=5.8.0"
+    }
+}
