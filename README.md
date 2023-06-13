@@ -2,7 +2,7 @@
 
 This package provides a set of new artisan commands for Laravel
 
-this package is based on another laravel package ``dannyvilla/artisan-commands``, my package adds other options which are not yet available in this one for example the use of a modular architecture with laravel ``nwidart/laravel-modules`` and many other options. 
+This package is based on another laravel package ``dannyvilla/artisan-commands``, my package adds other options which are not yet available in this one for example the use of a modular architecture with laravel ``nwidart/laravel-modules`` and many other options. 
 
 ## Installation
 
