@@ -3,8 +3,10 @@
 namespace Kernel243\Artisan;
 
 use Illuminate\Support\ServiceProvider;
+use Kernel243\Artisan\Commands\File;
 use Kernel243\Artisan\Commands\Repository;
 use Kernel243\Artisan\Commands\Service;
+use Kernel243\Artisan\Commands\View;
 
 class CommandServiceProvider extends ServiceProvider {
 
@@ -18,7 +20,9 @@ class CommandServiceProvider extends ServiceProvider {
         if ($this->app->runningInConsole()) {
             $this->commands([
                 Repository::class,
-                Service::class
+                Service::class,
+                File::class,
+                View::class
             ]);
         }
     }
