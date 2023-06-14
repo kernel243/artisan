@@ -239,13 +239,12 @@ class Repository extends Command
                     if ($this->moduleExists(ucfirst($module))) {
                         if ($this->modelFileExists($model, $module)) {
                             $modelNameSpace = 'Modules\\'.$module.'\\Entities';
-                            $namespace = 'Modules\\'.$module.'\\Repositories';
+                            $namespace = 'Modules\\'.ucfirst($module).'\\Repositories';
                             $content = $this->replaceNamespace($namespace, $this->getStub());
                             $content = $this->replaceModelNamespace($modelNameSpace, $content);
                             $content = $this->replaceModelName($model, $content);
                             $content = $this->replacePropertyName($name, $content);
                             $content = $this->replaceClassName($name, $content);
-                            $this->output->success('Model exists');
                         } else {
                             $this->output->error('The specified model "'.$this->option('model').'" does not exist.');
                         }
