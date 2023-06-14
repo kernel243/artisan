@@ -2,9 +2,11 @@
 
 This package provides a set of new artisan commands for Laravel
 
+This package is based on another laravel package ``dannyvilla/artisan-commands``, my package adds other options which are not yet available in this one for example the use of a modular architecture with laravel ``nwidart/laravel-modules`` and many other options. 
+
 ## Installation
 
-Use the package manager [composer](https://getcomposer.org/) to install dannyvilla/artisan-commands
+Use the package manager [composer](https://getcomposer.org/) to install kernel243/artisan
 
 ```bash
 composer require kernel243/artisan
@@ -32,15 +34,19 @@ php artisan make:repository UserRepository
 ```bash
 php artisan make:repository UserRepository --model=User
 ```
-OR
+#### Generate a repository with a module
 ```bash
-php artisan make:repository UserRepository --model=App\Models\User
+php artisan make:repository UserRepository --model=Country --module=Setting
 ```
 
 ### Service command
 #### Generate a serfvice class
 ```bash
 php artisan make:service PayPalPaymentService
+```
+#### Generate a serfvice class with a module
+```bash
+php artisan make:service PayPalPaymentService --module=Payment
 ```
 
 ### Lang command
