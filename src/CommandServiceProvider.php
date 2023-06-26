@@ -3,6 +3,7 @@
 namespace Kernel243\Artisan;
 
 use Illuminate\Support\ServiceProvider;
+use Kernel243\Artisan\Commands\Controller;
 use Kernel243\Artisan\Commands\File;
 use Kernel243\Artisan\Commands\Repository;
 use Kernel243\Artisan\Commands\Resource;
@@ -24,7 +25,8 @@ class CommandServiceProvider extends ServiceProvider {
                 Service::class,
                 File::class,
                 View::class,
-                Resource::class
+                Resource::class,
+                Controller::class
             ]);
         }
     }

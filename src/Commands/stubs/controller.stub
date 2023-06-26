@@ -1,0 +1,85 @@
+<?php
+
+namespace DummyNamespace;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
+use Illuminate\Routing\Controller;
+use DummyModelNamespace;
+use DummyNamespaceRepository;
+use DummyNamespaceResource;
+
+class DummyClass extends Controller
+{
+
+    protected DummyProperty $dummyProperty;
+
+    public function __construct(DummyProperty $dummyProperty)
+    {
+        $this->countryRepository = $dummyProperty;
+    }
+
+    /**
+     * Display a listing of the resource.
+     * @return AnonymousResourceCollection
+     */
+    public function index()
+    {
+        return DummyResource::collection($this->dummyProperty->getAll());
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     * @param Request $request
+     * @return DummyResource
+     */
+    public function store(Request $request)
+    {
+        return new DummyResource($this->dummyProperty->store($request->all()));
+    }
+
+    /**
+     * Show the specified resource.
+     * @param DummyModel $dummyModel
+     * @return DummyResource
+     */
+    public function show(DummyModel $dummyModel)
+    {
+        return new DummyResource($dummyModel);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     * @param Request $request
+     * @param DummyModel $dummyModel
+     * @return DummyResource
+     */
+    public function update(Request $request, DummyModel $dummyModel)
+    {
+        return new DummyResource($this->dummyProperty->update(
+            $request->except(['_token', '_method']), $dummyModel->id
+        ));
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     * @param DummyModel $dummyModel
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroy(DummyModel $dummyModel)
+    {
+        $this->dummyProperty->delete($dummyModel->id);
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * @param DummyModel $dummyModel
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function forceDelete(DummyModel $dummyModel)
+    {
+        $this->dummyProperty->forceDelete($dummyModel->id);
+        return response()->json(['success' => true]);
+    }
+}
