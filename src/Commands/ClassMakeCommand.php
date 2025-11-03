@@ -45,7 +45,7 @@ class ClassMakeCommand extends BaseCommand
             $namespace = $this->buildNamespace($pathParts);
 
             $stub = $this->replaceKindName($kind, $className, $stub);
-            $stub = $this->replaceNamespace($namespace, $stub);
+            $stub = $this->replaceClassNamespace($namespace, $stub);
 
             $this->writeFile($path, $stub);
             $this->displaySuccess(ucfirst($kind) . ' created successfully!', $path);
@@ -80,7 +80,7 @@ class ClassMakeCommand extends BaseCommand
         return str_replace('Dummy' . ucfirst($kind), ucfirst($name), $stub);
     }
 
-    protected function replaceNamespace(string $namespace, string $stub): string
+    protected function replaceClassNamespace(string $namespace, string $stub): string
     {
         if (!empty($namespace)) {
             return str_replace('DummyNamespace', 'namespace ' . $namespace . ';', $stub);
