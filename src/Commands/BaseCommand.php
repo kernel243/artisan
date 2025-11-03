@@ -135,6 +135,74 @@ class BaseCommand extends Command
     }
 
     /**
+     * Read a stub file by logical name from this package stubs directory.
+     */
+    protected function getStubContent(string $name): string
+    {
+        $path = __DIR__ . '/stubs/' . str_replace('.', '/', $name) . '.stub';
+        if (!file_exists($path)) {
+            throw new \RuntimeException('Stub not found: ' . $path);
+        }
+        return (string) file_get_contents($path);
+    }
+
+    /**
+     * Write content to a file, creating parent directories when needed.
+     */
+    protected function writeFile(string $path, string $content): void
+    {
+        $dir = dirname($path);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        file_put_contents($path, $content);
+    }
+
+    /**
+     * Ask whether a file should be replaced unless --force is provided.
+     */
+    protected function shouldReplaceFile(string $path, string $question = 'Replace file? [y/n]'): bool
+    {
+        if (!file_exists($path)) {
+            return true;
+        }
+        if ($this->option('force')) {
+            return true;
+        }
+        do {
+            $input = strtolower($this->ask($question));
+        } while ($input !== 'y' && $input !== 'n');
+        return $input === 'y';
+    }
+
+    /**
+     * Simple success output helper.
+     */
+    protected function displaySuccess(string $message, string $path): void
+    {
+        $this->info($message);
+        $this->line(' → ' . $path);
+    }
+
+    /**
+     * Ensure a directory exists.
+     */
+    protected function ensureDirectoryExists(string $directory): void
+    {
+        if (!file_exists($directory)) {
+            mkdir($directory, 0755, true);
+        }
+    }
+
+    /**
+     * Basic filename validation for ClassMakeCommand.
+     */
+    protected function isValidFilename(string $filename): bool
+    {
+        return (bool) preg_match('#^[A-Za-z0-9_\\\\/\.-]+$#', $filename);
+    }
+
+    /**
      * Check if a repository file exists.
      *
      * @param $repository

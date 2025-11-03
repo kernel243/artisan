@@ -1,8 +1,13 @@
-# Kenernel243/Artisan
+# Kernel243/Artisan
 
-This package provides a set of new artisan commands for Laravel
+[![Packagist Downloads](https://img.shields.io/packagist/dt/kernel243/artisan.svg?style=for-the-badge)](https://packagist.org/packages/kernel243/artisan)
+[![Visits](https://badges.pufler.dev/visits/kernel243/artisan?style=for-the-badge)](https://packagist.org/packages/kernel243/artisan)
+
+This package provides a set of new artisan commands for Laravel.
 
 This package is based on another laravel package ``dannyvilla/artisan-commands``, my package adds other options which are not yet available in this one for example the use of a modular architecture with laravel ``nwidart/laravel-modules`` and many other options. 
+
+Visit the developer website: [developper.elongocrea.com](https://developper.elongocrea.com)
 
 ## Installation
 
@@ -84,6 +89,18 @@ php artisan make:class App\Contracts\IClassable --kind=interface
 #### Generate a generic file 
 ```bash
 php artisan make:file folder.subfolder1.subfolder2.filename --ext=php
+```
+
+### CRUD command
+Generate a CRUD with model, repository, service, controller and Tailwind views
+```bash
+php artisan make:crud Product --fields="title:string,description:text,price:decimal,is_active:boolean"
+```
+
+### Resource CRUD command
+Generate CRUD using a Resource class (Filament-inspired)
+```bash
+php artisan make:resource-crud Product --fields="title:string,description:text"
 ```
 
 ## Contributing

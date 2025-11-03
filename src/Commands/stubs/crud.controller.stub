@@ -1,0 +1,67 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\DummyService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class DummyController extends Controller
+{
+    protected $service;
+
+    public function __construct(DummyService $service)
+    {
+        $this->service = $service;
+    }
+
+    public function index(): View
+    {
+        $DummyPluralVariable = $this->service->getPaginated();
+        return view('DummyViewPath.index', compact('DummyPluralVariable'));
+    }
+
+    public function create(): View
+    {
+        return view('DummyViewPath.create');
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            // Add your validation rules here
+        ]);
+        $this->service->create($validated);
+        return redirect()->route('DummyViewPath.index')->with('success', 'Item created successfully.');
+    }
+
+    public function show(int $id): View
+    {
+        $DummyVariable = $this->service->getById($id);
+        return view('DummyViewPath.show', compact('DummyVariable'));
+    }
+
+    public function edit(int $id): View
+    {
+        $DummyVariable = $this->service->getById($id);
+        return view('DummyViewPath.edit', compact('DummyVariable'));
+    }
+
+    public function update(Request $request, int $id): RedirectResponse
+    {
+        $validated = $request->validate([
+            // Add your validation rules here
+        ]);
+        $this->service->update($id, $validated);
+        return redirect()->route('DummyViewPath.index')->with('success', 'Item updated successfully.');
+    }
+
+    public function destroy(int $id): RedirectResponse
+    {
+        $this->service->delete($id);
+        return redirect()->route('DummyViewPath.index')->with('success', 'Item deleted successfully.');
+    }
+}
+
+

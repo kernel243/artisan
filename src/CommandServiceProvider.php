@@ -21,6 +21,10 @@ class CommandServiceProvider extends ServiceProvider
                 Commands\View::class,
                 Commands\Resource::class,
                 Commands\Controller::class,
+                Commands\Lang::class,
+                Commands\ClassMakeCommand::class,
+                Commands\CrudMakeCommand::class,
+                Commands\ResourceMakeCommand::class,
             ]);
         }
     }
