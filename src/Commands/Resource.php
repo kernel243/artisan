@@ -65,9 +65,9 @@ class Resource extends BaseCommand
     /**
      * Rewrite actually the content in the file.
      *
-     * @param $filename
-     * @param null $content
-     * @param $module
+     * @param string $filename
+     * @param string $content
+     * @param string $module
      */
     protected function putInFile($filename, $content, $module = null)
     {

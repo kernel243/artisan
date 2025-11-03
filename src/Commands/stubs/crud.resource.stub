@@ -1,0 +1,56 @@
+<?php
+
+namespace App\Resources;
+
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * DummyResourceName Resource Class
+ * 
+ * This class defines the structure and behavior of DummyResourceName CRUD operations
+ */
+class DummyResourceClass extends Resource
+{
+    protected $model = App\Models\DummyModel::class;
+    protected $name = 'DummyResourcePlural';
+    protected $routePrefix = 'DummyResourceKebab';
+    protected $view = null;
+
+    public function form($form)
+    {
+        return $form->schema([
+            // Define your form fields here
+DummyFormFields
+        ]);
+    }
+
+    public function table($table)
+    {
+        return $table->columns([
+            // Define your table columns here
+DummyTableColumns
+        ]);
+    }
+
+    public function actions()
+    {
+        return [
+            // Define your custom actions here
+            // Example: 'export', 'bulk_delete', etc.
+        ];
+    }
+
+    public function rules()
+    {
+        return [
+            // Define validation rules here
+DummyValidationRules
+        ];
+    }
+
+    public function getFillable()
+    {
+        return app($this->model)->getFillable();
+    }
+}
+

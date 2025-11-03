@@ -1,0 +1,47 @@
+<?php
+
+namespace App\Services;
+
+use App\Repositories\DummyRepository;
+use Illuminate\Database\Eloquent\Model;
+
+class DummyClass
+{
+    protected $repository;
+
+    public function __construct(DummyRepository $repository)
+    {
+        $this->repository = $repository;
+    }
+
+    public function getAll()
+    {
+        return $this->repository->getAll();
+    }
+
+    public function getPaginated(int $perPage = 15)
+    {
+        return $this->repository->getPaginate($perPage);
+    }
+
+    public function getById(int $id)
+    {
+        return $this->repository->getById($id);
+    }
+
+    public function create(array $data)
+    {
+        return $this->repository->store($data);
+    }
+
+    public function update(int $id, array $data)
+    {
+        return $this->repository->update($data, $id);
+    }
+
+    public function delete(int $id): void
+    {
+        $this->repository->delete($id);
+    }
+}
+

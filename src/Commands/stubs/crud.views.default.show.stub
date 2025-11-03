@@ -1,0 +1,57 @@
+@extends('layouts.app')
+
+@section('title', 'View {{ $resourceName }}')
+
+@section('content')
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">View {{ $resourceName }}</h1>
+            <div class="space-x-2">
+                <a href="{{ route('{{ $routePrefix }}.edit', $item->id) }}" 
+                   class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
+                    Edit
+                </a>
+                <a href="{{ route('{{ $routePrefix }}.index') }}" 
+                   class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    Back to List
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-white shadow-md rounded p-8">
+            <dl class="space-y-0">
+                @foreach($detailFields as $field)
+                    <div class="border-b border-gray-200 py-2">
+                        <dt class="text-gray-500 font-semibold">{{ $field['label'] }}:</dt>
+                        <dd class="text-gray-900">
+                            @if($field['type'] === 'boolean')
+                                {{ $item->{$field['name']} ? 
+                                    '<span class="text-green-600"><i class="fas fa-check"></i> Yes</span>' : 
+                                    '<span class="text-red-600"><i class="fas fa-times"></i> No</span>' 
+                                }}
+                            @else
+                                {{ $item->{$field['name']} }}
+                            @endif
+                        </dd>
+                    </div>
+                @endforeach
+            </dl>
+        </div>
+
+        <div class="mt-4">
+            <form action="{{ route('{{ $routePrefix }}.destroy', $item->id) }}" method="POST" class="inline">
+                @csrf
+                @method('DELETE')
+                <button type="submit" 
+                        class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+                        onclick="return confirm('Are you sure you want to delete this item?')">
+                    Delete
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+@endsection
+
+

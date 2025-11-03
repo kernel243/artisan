@@ -1,0 +1,75 @@
+<?php
+
+namespace App\Builders;
+
+/**
+ * Form Builder Class
+ * 
+ * Used to build form schemas for resources
+ */
+class Form
+{
+    protected $fields = [];
+
+    public function __construct(array $fields = [])
+    {
+        $this->fields = $fields;
+    }
+
+    public function schema(array $fields)
+    {
+        $this->fields = $fields;
+        return $this;
+    }
+
+    public function getFields()
+    {
+        return $this->fields;
+    }
+
+    public static function text($name, $label, $options = [])
+    {
+        return array_merge([
+            'type' => 'text',
+            'name' => $name,
+            'label' => $label,
+        ], $options);
+    }
+
+    public static function textarea($name, $label, $options = [])
+    {
+        return array_merge([
+            'type' => 'textarea',
+            'name' => $name,
+            'label' => $label,
+        ], $options);
+    }
+
+    public static function email($name, $label, $options = [])
+    {
+        return array_merge([
+            'type' => 'email',
+            'name' => $name,
+            'label' => $label,
+        ], $options);
+    }
+
+    public static function select($name, $label, $options = [])
+    {
+        return array_merge([
+            'type' => 'select',
+            'name' => $name,
+            'label' => $label,
+        ], $options);
+    }
+
+    public static function checkbox($name, $label, $options = [])
+    {
+        return array_merge([
+            'type' => 'checkbox',
+            'name' => $name,
+            'label' => $label,
+        ], $options);
+    }
+}
+

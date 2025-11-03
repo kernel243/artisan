@@ -203,6 +203,24 @@ class BaseCommand extends Command
     }
 
     /**
+     * Create folders if necessary for file paths.
+     *
+     * @param array $pathParts
+     * @param string $basePath
+     * @return void
+     */
+    protected function createFoldersIfNecessary(array $pathParts, string $basePath): void
+    {
+        $folder = $basePath;
+        for ($i = 0; $i < count($pathParts) - 1; $i++) {
+            $folder .= DIRECTORY_SEPARATOR . $pathParts[$i];
+            if (!is_dir($folder)) {
+                mkdir($folder, 0755, true);
+            }
+        }
+    }
+
+    /**
      * Check if a repository file exists.
      *
      * @param $repository

@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Kernel243\Artisan\Commands;
 
 class Lang extends BaseCommand

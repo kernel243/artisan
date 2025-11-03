@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Kernel243\Artisan\Commands;
 
 use Illuminate\Support\Str;
@@ -245,6 +243,15 @@ class ResourceMakeCommand extends BaseCommand
         $stub = $this->getStubContent('crud.layout');
         if (!$this->shouldReplaceFile($path, 'Layout exists. Replace it? [y/n]')) return;
         $this->ensureDirectoryExists(resource_path('views/layouts'));
+        $this->writeFile($path, $stub);
+    }
+
+    protected function generateTailwindConfig(): void
+    {
+        $path = base_path('tailwind.config.js');
+        if (file_exists($path)) return;
+        $stub = $this->getStubContent('tailwind.config');
+        if (!$this->shouldReplaceFile($path, 'Tailwind config exists. Replace it? [y/n]')) return;
         $this->writeFile($path, $stub);
     }
 

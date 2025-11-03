@@ -1,0 +1,50 @@
+<?php
+
+namespace App\Resources;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Request;
+
+/**
+ * Base Resource class
+ * 
+ * This is the base class for all resources
+ */
+abstract class Resource
+{
+    protected $model;
+    protected $name;
+    protected $routePrefix;
+    protected $view = null;
+
+    public function getModel()
+    {
+        return app($this->model);
+    }
+
+    public function getName()
+    {
+        return $this->name;
+    }
+
+    public function getRoutePrefix()
+    {
+        return $this->routePrefix;
+    }
+
+    public function getView()
+    {
+        return $this->view;
+    }
+
+    abstract public function form($form);
+    abstract public function table($table);
+    abstract public function actions();
+    abstract public function rules();
+
+    public function getFillable()
+    {
+        return [];
+    }
+}
+
