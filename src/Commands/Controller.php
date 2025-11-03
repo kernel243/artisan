@@ -2,7 +2,6 @@
 
 namespace Kernel243\Artisan\Commands;
 
-use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 

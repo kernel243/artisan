@@ -1,0 +1,85 @@
+<?php
+
+namespace App\Builders;
+
+/**
+ * Table Builder Class
+ * 
+ * Used to build table columns for resources (Yajra DataTables compatible)
+ */
+class Table
+{
+    protected $columns = [];
+
+    public function __construct(array $columns = [])
+    {
+        $this->columns = $columns;
+    }
+
+    public function columns(array $columns)
+    {
+        $this->columns = $columns;
+        return $this;
+    }
+
+    public function getColumns()
+    {
+        return $this->columns;
+    }
+
+    public static function text($name, $label, $options = [])
+    {
+        return array_merge([
+            'type' => 'text',
+            'name' => $name,
+            'label' => $label,
+            'orderable' => true,
+            'searchable' => true,
+        ], $options);
+    }
+
+    public static function number($name, $label, $options = [])
+    {
+        return array_merge([
+            'type' => 'number',
+            'name' => $name,
+            'label' => $label,
+            'orderable' => true,
+            'searchable' => false,
+        ], $options);
+    }
+
+    public static function boolean($name, $label, $options = [])
+    {
+        return array_merge([
+            'type' => 'boolean',
+            'name' => $name,
+            'label' => $label,
+            'orderable' => true,
+            'searchable' => false,
+        ], $options);
+    }
+
+    public static function datetime($name, $label, $options = [])
+    {
+        return array_merge([
+            'type' => 'datetime',
+            'name' => $name,
+            'label' => $label,
+            'orderable' => true,
+            'searchable' => false,
+        ], $options);
+    }
+
+    public static function actions($options = [])
+    {
+        return array_merge([
+            'type' => 'actions',
+            'name' => 'actions',
+            'label' => 'Actions',
+            'orderable' => false,
+            'searchable' => false,
+        ], $options);
+    }
+}
+

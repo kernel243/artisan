@@ -54,9 +54,9 @@ class Service extends BaseCommand
     /**
      * Rewrite actually the content in the file.
      *
-     * @param null $module
-     * @param $filename
-     * @param $content
+     * @param string $filename
+     * @param string $content
+     * @param string $module
      */
     protected function putInFile($filename, $content, $module = null)
     {

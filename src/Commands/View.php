@@ -2,9 +2,7 @@
 
 namespace Kernel243\Artisan\Commands;
 
-use Illuminate\Console\Command;
-
-class View extends Command
+class View extends BaseCommand
 {
     /**
      * The name and signature of the console command.
