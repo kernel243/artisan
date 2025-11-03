@@ -1,0 +1,81 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Resources\DummyResourceClass;
+use App\Services\DummyService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class DummyController extends Controller
+{
+    protected $service;
+    protected $resource;
+
+    public function __construct(DummyService $service, DummyResourceClass $resource)
+    {
+        $this->service = $service;
+        $this->resource = $resource;
+    }
+
+    public function index(): View
+    {
+        $DummyPluralVariable = $this->service->getPaginated();
+        $tableBuilder = app(\App\Builders\Table::class);
+        $tableColumns = $this->resource->table($tableBuilder)->getColumns();
+        return view('DummyViewPath.index', compact('DummyPluralVariable', 'tableColumns'))
+            ->with(['resourceName' => $this->resource->getName(), 'routePrefix' => $this->resource->getRoutePrefix()]);
+    }
+
+    public function create(): View
+    {
+        $formBuilder = app(\App\Builders\Form::class);
+        $formFields = $this->resource->form($formBuilder)->getFields();
+        return view('DummyViewPath.create')
+            ->with(['resourceName' => $this->resource->getName(), 'routePrefix' => $this->resource->getRoutePrefix(), 'formFields' => $formFields]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $validated = $request->validate($this->resource->rules());
+        $this->service->create($validated);
+        return redirect()->route('DummyViewPath.index')->with('success', 'Item created successfully.');
+    }
+
+    public function show(int $id): View
+    {
+        $DummyVariable = $this->service->getById($id);
+        $formBuilder = app(\App\Builders\Form::class);
+        $formFields = $this->resource->form($formBuilder)->getFields();
+        $detailFields = array_map(function ($field) {
+            return ['name' => $field['name'], 'label' => $field['label'], 'type' => $field['type'] ?? 'text'];
+        }, $formFields);
+        return view('DummyViewPath.show', compact('DummyVariable', 'detailFields'))
+            ->with(['resourceName' => $this->resource->getName(), 'routePrefix' => $this->resource->getRoutePrefix()]);
+    }
+
+    public function edit(int $id): View
+    {
+        $DummyVariable = $this->service->getById($id);
+        $formBuilder = app(\App\Builders\Form::class);
+        $formFields = $this->resource->form($formBuilder)->getFields();
+        return view('DummyViewPath.edit', compact('DummyVariable', 'formFields'))
+            ->with(['resourceName' => $this->resource->getName(), 'routePrefix' => $this->resource->getRoutePrefix()]);
+    }
+
+    public function update(Request $request, int $id): RedirectResponse
+    {
+        $validated = $request->validate($this->resource->rules());
+        $this->service->update($id, $validated);
+        return redirect()->route('DummyViewPath.index')->with('success', 'Item updated successfully.');
+    }
+
+    public function destroy(int $id): RedirectResponse
+    {
+        $this->service->delete($id);
+        return redirect()->route('DummyViewPath.index')->with('success', 'Item deleted successfully.');
+    }
+}
+
+

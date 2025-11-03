@@ -5,7 +5,6 @@ namespace Kernel243\Artisan\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use function PHPUnit\Framework\isEmpty;
 
 class Repository extends BaseCommand
 {
@@ -61,13 +60,16 @@ class Repository extends BaseCommand
      */
     protected function putInFile($filename, $content, $module = null)
     {
-       if (!is_null($module)) {
-           $modulePath = base_path('Modules/'.$module.'/Repositories');
-           if (!is_dir($modulePath)) mkdir($modulePath);
-       } else {
-           if (!is_dir(app_path('/Repositories')))
-               mkdir(app_path('/Repositories'));
-       }
+        if (!is_null($module)) {
+            $modulePath = base_path('Modules/'.$module.'/Repositories');
+            if (!is_dir($modulePath)) {
+                mkdir($modulePath, 0755, true);
+            }
+        } else {
+            if (!is_dir(app_path('/Repositories'))) {
+                mkdir(app_path('/Repositories'), 0755, true);
+            }
+        }
 
         file_put_contents($filename, $content);
     }

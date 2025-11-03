@@ -3,30 +3,28 @@
 namespace Kernel243\Artisan;
 
 use Illuminate\Support\ServiceProvider;
-use Kernel243\Artisan\Commands\Controller;
-use Kernel243\Artisan\Commands\File;
-use Kernel243\Artisan\Commands\Repository;
-use Kernel243\Artisan\Commands\Resource;
-use Kernel243\Artisan\Commands\Service;
-use Kernel243\Artisan\Commands\View;
 
-class CommandServiceProvider extends ServiceProvider {
-
+class CommandServiceProvider extends ServiceProvider
+{
     /**
      * Bootstrap the application services.
      *
      * @return void
      */
-    public function boot()
+    public function boot(): void
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-                Repository::class,
-                Service::class,
-                File::class,
-                View::class,
-                Resource::class,
-                Controller::class
+                Commands\Repository::class,
+                Commands\Service::class,
+                Commands\File::class,
+                Commands\View::class,
+                Commands\Resource::class,
+                Commands\Controller::class,
+                Commands\Lang::class,
+                Commands\ClassMakeCommand::class,
+                Commands\CrudMakeCommand::class,
+                Commands\ResourceMakeCommand::class,
             ]);
         }
     }
@@ -36,9 +34,8 @@ class CommandServiceProvider extends ServiceProvider {
      *
      * @return void
      */
-    public function register()
+    public function register(): void
     {
         //
     }
-
 }

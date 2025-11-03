@@ -23,15 +23,15 @@ class BaseCommand extends Command
     /**
      * Checks if a folder exist and return canonicalized absolute pathname (sort version)
      * @param string $folder the path being checked.
-     * @return mixed returns the canonicalized absolute pathname on success otherwise FALSE is returned
+     * @return string|false returns the canonicalized absolute pathname on success otherwise FALSE is returned
      */
-    protected  function folderExist($folder)
+    protected function folderExist(string $folder)
     {
         // Get canonicalized absolute pathname
         $path = realpath($folder);
 
         // If it exists, check if it's a directory
-        return ($path !== false AND is_dir($path)) ? $path : false;
+        return ($path !== false && is_dir($path)) ? $path : false;
     }
 
     /**
@@ -135,6 +135,74 @@ class BaseCommand extends Command
     }
 
     /**
+     * Read a stub file by logical name from this package stubs directory.
+     */
+    protected function getStubContent(string $name): string
+    {
+        $path = __DIR__ . '/stubs/' . str_replace('.', '/', $name) . '.stub';
+        if (!file_exists($path)) {
+            throw new \RuntimeException('Stub not found: ' . $path);
+        }
+        return (string) file_get_contents($path);
+    }
+
+    /**
+     * Write content to a file, creating parent directories when needed.
+     */
+    protected function writeFile(string $path, string $content): void
+    {
+        $dir = dirname($path);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        file_put_contents($path, $content);
+    }
+
+    /**
+     * Ask whether a file should be replaced unless --force is provided.
+     */
+    protected function shouldReplaceFile(string $path, string $question = 'Replace file? [y/n]'): bool
+    {
+        if (!file_exists($path)) {
+            return true;
+        }
+        if ($this->option('force')) {
+            return true;
+        }
+        do {
+            $input = strtolower($this->ask($question));
+        } while ($input !== 'y' && $input !== 'n');
+        return $input === 'y';
+    }
+
+    /**
+     * Simple success output helper.
+     */
+    protected function displaySuccess(string $message, string $path): void
+    {
+        $this->info($message);
+        $this->line(' → ' . $path);
+    }
+
+    /**
+     * Ensure a directory exists.
+     */
+    protected function ensureDirectoryExists(string $directory): void
+    {
+        if (!file_exists($directory)) {
+            mkdir($directory, 0755, true);
+        }
+    }
+
+    /**
+     * Basic filename validation for ClassMakeCommand.
+     */
+    protected function isValidFilename(string $filename): bool
+    {
+        return (bool) preg_match('#^[A-Za-z0-9_\\\\/\.-]+$#', $filename);
+    }
+
+    /**
      * Check if a repository file exists.
      *
      * @param $repository
@@ -144,11 +212,12 @@ class BaseCommand extends Command
     protected function repositoryFileExists($repository, $module = null): bool
     {
         if (is_null($module)) {
-            return file_exists( base_path(lcfirst($repository).'.php')) || file_exists( base_path(lcfirst(str_replace('\\', '/', $repository)).'.php'));
+            $repositoryName = ucfirst(basename(str_replace('\\', '/', $repository)));
+            return file_exists(app_path('Repositories/'.$repositoryName.'.php'));
         }
 
-        $path = base_path('Modules/'.ucfirst($module).'/Repositories/'.lcfirst($repository).'.php');
-        return file_exists($path) || file_exists('Modules/'.base_path(ucfirst($module).'/Repositories/'.lcfirst(str_replace('\\', '/', $repository)).'.php'));
+        $path = base_path('Modules/'.ucfirst($module).'/Repositories/'.ucfirst(basename(str_replace('\\', '/', $repository))).'.php');
+        return file_exists($path);
     }
 
     /**
@@ -167,7 +236,7 @@ class BaseCommand extends Command
         $module = '';
 
         for ($i = 0; $i < count($exploded) - 1; $i++) {
-            if (!isEmpty($module)) {
+            if (!empty($module)) {
                 $namespace .= $module.'\\'.$exploded[$i].'\\'.'Entities\\';
             } else {
                 $namespace .= $exploded[$i].'\\';
@@ -193,7 +262,7 @@ class BaseCommand extends Command
         $module = '';
 
         for ($i = 0; $i < count($exploded) - 1; $i++) {
-            if (!isEmpty($module)) {
+            if (!empty($module)) {
                 $namespace .= $module.'\\'.$exploded[$i].'\\'.'Repositories\\';
             } else {
                 $namespace .= $exploded[$i].'\\';
@@ -213,11 +282,12 @@ class BaseCommand extends Command
     protected function modelFileExists($model, $module = null): bool
     {
         if (is_null($module)) {
-            return file_exists( base_path(lcfirst($model).'.php')) || file_exists( base_path(lcfirst(str_replace('\\', '/', $model)).'.php'));
+            $modelName = ucfirst(basename(str_replace('\\', '/', $model)));
+            return file_exists(app_path('Models/'.$modelName.'.php'));
         }
 
-        $path = base_path('Modules/'.ucfirst($module).'/Entities/'.lcfirst($model).'.php');
-        return file_exists($path) || file_exists('Modules/'.base_path(ucfirst($module).'/Entities/'.lcfirst(str_replace('\\', '/', $model)).'.php'));
+        $path = base_path('Modules/'.ucfirst($module).'/Entities/'.ucfirst(basename(str_replace('\\', '/', $model))).'.php');
+        return file_exists($path);
     }
 
 
