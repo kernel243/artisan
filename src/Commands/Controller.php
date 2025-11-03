@@ -61,10 +61,13 @@ class Controller extends BaseCommand
     {
         if (!is_null($module)) {
             $modulePath = base_path('Modules/'.$module.'/Http/Controllers');
-            if (!is_dir($modulePath)) mkdir($modulePath);
+            if (!is_dir($modulePath)) {
+                mkdir($modulePath, 0755, true);
+            }
         } else {
-            if (!is_dir(app_path('/Http/Controllers')))
-                mkdir(app_path('/Http/Controllers'));
+            if (!is_dir(app_path('/Http/Controllers'))) {
+                mkdir(app_path('/Http/Controllers'), 0755, true);
+            }
         }
 
         file_put_contents($filename, $content);

@@ -2,9 +2,7 @@
 
 namespace Kernel243\Artisan\Commands;
 
-use Illuminate\Console\Command;
-
-class Resource extends Command
+class Resource extends BaseCommand
 {
     /**
      * The name and signature of the console command
@@ -75,10 +73,13 @@ class Resource extends Command
     {
         if (!is_null($module)) {
             $modulePath = base_path('Modules/'.ucfirst($module).'/Http/Resources');
-            if (!is_dir($modulePath)) mkdir($modulePath);
+            if (!is_dir($modulePath)) {
+                mkdir($modulePath, 0755, true);
+            }
         } else {
-            if (!is_dir(app_path('/Http/Resources')))
-                mkdir(app_path('/Http/Resources'));
+            if (!is_dir(app_path('/Http/Resources'))) {
+                mkdir(app_path('/Http/Resources'), 0755, true);
+            }
         }
 
         file_put_contents($filename, $content);
@@ -91,39 +92,15 @@ class Resource extends Command
      * @param $module
      * @return bool
      */
-    protected function resourceFileExists($resource, $module = null)
+    protected function resourceFileExists($resource, $module = null): bool
     {
         if (is_null($module)) {
-            return file_exists(base_path(lcfirst($resource).'php')) || file_exists( base_path(lcfirst(str_replace('\\', '/', $resource)).'.php'));
+            $resourceName = ucfirst(basename(str_replace('\\', '/', $resource)));
+            return file_exists(app_path('Http/Resources/'.$resourceName.'.php'));
         }
 
-        $path = base_path('Modules/'.ucfirst($module).'/Http/Resources/'.lcfirst($resource).'.php');
-        return file_exists($path) || file_exists('Modules/'.base_path(ucfirst($module).'/Entities/'.lcfirst(str_replace('\\', '/', $resource)).'.php'));
-    }
-
-    /**
-     * Check if a module folder exists
-     *
-     * @param $module
-     * @return false|mixed
-     */
-    protected function moduleExists($module)
-    {
-        return $this->folderExist('Modules/'.$module);
-    }
-
-    /**
-     * Checks if a folder exist and return canonicalized absolute pathname (sort version)
-     * @param string $folder the path being checked.
-     * @return mixed returns the canonicalized absolute pathname on success otherwise FALSE is returned
-     */
-    protected  function folderExist($folder)
-    {
-        // Get canonicalized absolute pathname
-        $path = realpath($folder);
-
-        // If it exists, check if it's a directory
-        return ($path !== false AND is_dir($path)) ? $path : false;
+        $path = base_path('Modules/'.ucfirst($module).'/Http/Resources/'.ucfirst(basename(str_replace('\\', '/', $resource))).'.php');
+        return file_exists($path);
     }
 
     /**

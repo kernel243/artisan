@@ -2,9 +2,7 @@
 
 namespace Kernel243\Artisan\Commands;
 
-use Illuminate\Console\Command;
-
-class Service extends Command
+class Service extends BaseCommand
 {
     /**
      * The name and signature of the console command.
@@ -62,13 +60,15 @@ class Service extends Command
      */
     protected function putInFile($filename, $content, $module = null)
     {
-        $this->info($module);
         if (!is_null($module)) {
             $modulePath = base_path('Modules/'.$module.'/Services');
-            if (!is_dir($modulePath)) mkdir($modulePath);
+            if (!is_dir($modulePath)) {
+                mkdir($modulePath, 0755, true);
+            }
         } else {
-            if (!is_dir(app_path('/Services')))
-                mkdir(app_path('/Services'));
+            if (!is_dir(app_path('/Services'))) {
+                mkdir(app_path('/Services'), 0755, true);
+            }
         }
 
         file_put_contents($filename, $content);
@@ -86,39 +86,15 @@ class Service extends Command
         return str_replace('DummyNamespace', ucfirst($namespace), $stub);
     }
 
-    protected function serviceFileExist($service, $module = null)
+    protected function serviceFileExist($service, $module = null): bool
     {
         if (is_null($module)) {
-            return file_exists(base_path(lcfirst($service).'php')) || file_exists( base_path(lcfirst(str_replace('\\', '/', $service)).'.php'));
+            $serviceName = ucfirst(basename(str_replace('\\', '/', $service)));
+            return file_exists(app_path('Services/'.$serviceName.'.php'));
         }
 
-        $path = base_path('Modules/'.ucfirst($module).'/Services/'.lcfirst($service).'.php');
-        return file_exists($path) || file_exists('Modules/'.base_path(ucfirst($module).'/Services/'.lcfirst(str_replace('\\', '/', $service)).'.php'));
-    }
-
-    /**
-     * Check if a module folder exists
-     *
-     * @param $module
-     * @return false|mixed
-     */
-    protected function moduleExists($module)
-    {
-        return $this->folderExist('Modules/'.$module);
-    }
-
-    /**
-     * Checks if a folder exist and return canonicalized absolute pathname (sort version)
-     * @param string $folder the path being checked.
-     * @return mixed returns the canonicalized absolute pathname on success otherwise FALSE is returned
-     */
-    protected  function folderExist($folder)
-    {
-        // Get canonicalized absolute pathname
-        $path = realpath($folder);
-
-        // If it exists, check if it's a directory
-        return ($path !== false AND is_dir($path)) ? $path : false;
+        $path = base_path('Modules/'.ucfirst($module).'/Services/'.ucfirst(basename(str_replace('\\', '/', $service))).'.php');
+        return file_exists($path);
     }
 
     /**
