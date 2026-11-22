@@ -2,147 +2,118 @@
 
 namespace DummyNamespace;
 
-use DummyModelNamespace\DummyModel;
-use Illuminate\Database\Eloquent\Collection;
+use DummyModelClass;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 
 class DummyClass
 {
-    /**
-     * The DummyModel model.
-     *
-     * @var DummyModel
-     */
-    protected DummyModel $DummyProperty;
-
-    /**
-     * DummyClass constructor.
-     *
-     * @param DummyModel|null $DummyProperty
-     */
-    public function __construct(DummyModel $DummyProperty = null)
+    public function __construct(protected DummyModel $DummyProperty = new DummyModel())
     {
-        $this->DummyProperty = $DummyProperty ?? new DummyModel();
     }
 
     /**
-     * Retrieve a specified DummyProperty from database by id.
-     *
-     * @param $id
-     * @return DummyModel
+     * Retrieve a DummyModel by its primary key.
      */
-    public function getById($id)
+    public function getById(mixed $id): DummyModel
     {
-        return $this->DummyProperty->findOrFail($id);
+        return $this->DummyProperty->newQuery()->findOrFail($id);
     }
 
     /**
-     * Retrieve all DummyProperty from database.
+     * Retrieve all DummyModel records.
      *
-     * @return Collection|static[]
+     * @return Collection<int, DummyModel>
      */
-    public function getAll()
+    public function getAll(): Collection
     {
-        return $this->DummyProperty->all();
+        return $this->DummyProperty->newQuery()->get();
     }
 
     /**
-     * Get a list of DummyProperty by pagination.
-     *
-     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     * Get a paginated list of DummyModel records.
      */
-    public function getPaginate($n = 15)
+    public function getPaginate(int $perPage = 15): LengthAwarePaginator
     {
-        return $this->DummyProperty->paginate($n);
+        return $this->DummyProperty->newQuery()->paginate($perPage);
     }
 
     /**
-     * Check if an instance exists according to a given value.
-     *
-     * @return bool
+     * Check if a DummyModel exists for the given field value.
      */
-    public function exists($field, $value, $condition = '=')
+    public function exists(string $field, mixed $value, string $operator = '='): bool
     {
-        return $this->DummyProperty->where($field, $condition, $value)->exists();
+        return $this->DummyProperty->newQuery()->where($field, $operator, $value)->exists();
     }
 
     /**
-     * Retrieve a DummyProperty from database by a field according to a given value.
-     *
-     * @return DummyModel
+     * Retrieve the first DummyModel matching the given field value.
      */
-    public function get($field, $value, $condition = '=')
+    public function get(string $field, mixed $value, string $operator = '='): DummyModel
     {
-        return $this->DummyProperty->where($field, $condition, $value)->firstOrFail();
+        return $this->DummyProperty->newQuery()->where($field, $operator, $value)->firstOrFail();
     }
 
     /**
-     * Retrieve a listing of DummyProperty from database according to constraints by pagination.
+     * Get a paginated list of DummyModel records matching the constraints.
      *
-     * @param array $constraints
-     * @param int $n
-     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     * @param  array<string, mixed>  $constraints
      */
-    public function getListByPagination(array $constraints, $n = 30)
+    public function getListByPagination(array $constraints, int $perPage = 30): LengthAwarePaginator
     {
-        return $this->DummyProperty->where($constraints)->paginate($n);
+        return $this->DummyProperty->newQuery()->where($constraints)->paginate($perPage);
     }
 
     /**
-     * Retrieve a listing of DummyProperty from database according to constraints.
+     * Get the DummyModel records matching the constraints.
      *
-     * @param array $constraints
-     * @return Collection|static[]
+     * @param  array<string, mixed>  $constraints
+     * @return Collection<int, DummyModel>
      */
-    public function getList(array $constraints)
+    public function getList(array $constraints): Collection
     {
-        return $this->DummyProperty->where($constraints)->get();
+        return $this->DummyProperty->newQuery()->where($constraints)->get();
     }
 
     /**
-     * Store a new DummyProperty in the database.
+     * Store a new DummyModel.
      *
-     * @param array $inputs
-     * @return DummyModel
+     * @param  array<string, mixed>  $inputs
      */
-    public function store(array $inputs)
+    public function store(array $inputs): DummyModel
     {
-        return $this->DummyProperty->create($inputs);
+        return $this->DummyProperty->newQuery()->create($inputs);
     }
 
     /**
-     * Update a DummyProperty
+     * Update a DummyModel.
      *
-     * @return DummyModel
+     * @param  array<string, mixed>  $inputs
      */
-    public function update(array $inputs, $id)
+    public function update(array $inputs, mixed $id): DummyModel
     {
         $instance = $this->getById($id);
-        foreach($inputs as $property => $value)
-            $instance->$property = $value;
-        $instance->save();
-        return $this->getById($id);
+        $instance->update($inputs);
+
+        return $instance->refresh();
     }
 
     /**
-     * Remove a DummyProperty from database.
-     *
-     * @return void
+     * Delete a DummyModel.
      */
-    public function delete($id)
+    public function delete(mixed $id): void
     {
         $this->getById($id)->delete();
     }
 
     /**
-    * Remove a DummyProperty from database
-    *
-    * @return void
-    */
-    public function forceDelete($id)
+     * Permanently delete a DummyModel (models using SoftDeletes).
+     */
+    public function forceDelete(mixed $id): void
     {
-        $this->getById($id)->forceDelete();
+        $this->DummyProperty->newQuery()
+            ->when(method_exists($this->DummyProperty, 'trashed'), fn ($query) => $query->withTrashed())
+            ->findOrFail($id)
+            ->forceDelete();
     }
-
-    //
 }

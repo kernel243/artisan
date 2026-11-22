@@ -2,84 +2,62 @@
 
 namespace DummyNamespace;
 
+use DummyBaseControllerClass;
+use DummyModelClass;
+use DummyRepositoryClass;
+use DummyResourceClass;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Http\Response;
-use Illuminate\Routing\Controller;
-use DummyModelNamespace;
-use DummyNamespaceRepository;
-use DummyNamespaceResource;
 
-class DummyClass extends Controller
+class DummyClass extends DummyBaseController
 {
-
-    protected DummyProperty $dummyProperty;
-
-    public function __construct(DummyProperty $dummyProperty)
+    public function __construct(protected DummyRepository $DummyRepositoryProperty)
     {
-        $this->countryRepository = $dummyProperty;
     }
 
     /**
      * Display a listing of the resource.
-     * @return AnonymousResourceCollection
      */
-    public function index()
+    public function index(): AnonymousResourceCollection
     {
-        return DummyResource::collection($this->dummyProperty->getAll());
+        return DummyResource::collection($this->DummyRepositoryProperty->getPaginate());
     }
 
     /**
      * Store a newly created resource in storage.
-     * @param Request $request
-     * @return DummyResource
      */
-    public function store(Request $request)
+    public function store(Request $request): DummyResource
     {
-        return new DummyResource($this->dummyProperty->store($request->all()));
+        return new DummyResource($this->DummyRepositoryProperty->store($request->all()));
     }
 
     /**
-     * Show the specified resource.
-     * @param DummyModel $dummyModel
-     * @return DummyResource
+     * Display the specified resource.
      */
-    public function show(DummyModel $dummyModel)
+    public function show(DummyModel $DummyModelProperty): DummyResource
     {
-        return new DummyResource($dummyModel);
+        return new DummyResource($DummyModelProperty);
     }
 
     /**
      * Update the specified resource in storage.
-     * @param Request $request
-     * @param DummyModel $dummyModel
-     * @return DummyResource
      */
-    public function update(Request $request, DummyModel $dummyModel)
+    public function update(Request $request, DummyModel $DummyModelProperty): DummyResource
     {
-        return new DummyResource($this->dummyProperty->update(
-            $request->except(['_token', '_method']), $dummyModel->id
+        return new DummyResource($this->DummyRepositoryProperty->update(
+            $request->except(['_token', '_method']),
+            $DummyModelProperty->getKey()
         ));
     }
 
     /**
      * Remove the specified resource from storage.
-     * @param DummyModel $dummyModel
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy(DummyModel $dummyModel)
+    public function destroy(DummyModel $DummyModelProperty): JsonResponse
     {
-        $this->dummyProperty->delete($dummyModel->id);
-        return response()->json(['success' => true]);
-    }
+        $this->DummyRepositoryProperty->delete($DummyModelProperty->getKey());
 
-    /**
-     * @param DummyModel $dummyModel
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function forceDelete(DummyModel $dummyModel)
-    {
-        $this->dummyProperty->forceDelete($dummyModel->id);
         return response()->json(['success' => true]);
     }
 }

@@ -3,311 +3,244 @@
 namespace Kernel243\Artisan\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Arr;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
+use RuntimeException;
 
-class BaseCommand extends Command
+abstract class BaseCommand extends Command
 {
-
     /**
-     * Check if a module folder exists
-     *
-     * @param $module
-     * @return false|mixed
+     * Directory (relative to the application base path) where published stubs live.
      */
-    protected function moduleExists($module)
+    public const STUBS_OVERRIDE_DIRECTORY = 'stubs/kernel';
+
+    protected function files(): Filesystem
     {
-        return $this->folderExist('Modules/'.$module);
+        return $this->laravel->make(Filesystem::class);
     }
 
     /**
-     * Checks if a folder exist and return canonicalized absolute pathname (sort version)
-     * @param string $folder the path being checked.
-     * @return string|false returns the canonicalized absolute pathname on success otherwise FALSE is returned
-     */
-    protected function folderExist(string $folder)
-    {
-        // Get canonicalized absolute pathname
-        $path = realpath($folder);
-
-        // If it exists, check if it's a directory
-        return ($path !== false && is_dir($path)) ? $path : false;
-    }
-
-    /**
-     * Replace every DummyProperty with the right property name.
-     *
-     * @param $name
-     * @param $stub
-     * @return mixed
-     */
-    protected function replacePropertyName($name, $stub)
-    {
-        $property = lcfirst(Str::camel($name));
-        return str_replace('DummyProperty', $property, $stub);
-    }
-
-    /**
-     * Replace every DummyModel with the right model name.
-     *
-     * @param $name
-     * @param $stub
-     * @return mixed
-     */
-    protected function replaceModelName($name, $stub)
-    {
-        $model = ucfirst($name);
-        return str_replace('DummyModel', $model, $stub);
-    }
-
-    /**
-     * Replace every DummyResource with the right resource name.
-     *
-     * @param $name
-     * @param $stub
-     * @return mixed
-     */
-    protected function replaceResourceName($name, $stub)
-    {
-        $model = ucfirst($name);
-        return str_replace('DummyResource', $model, $stub);
-    }
-
-    /**
-     * Replace every DummyClass with the right class name.
-     *
-     * @param $name
-     * @param $stub
-     * @return mixed
-     */
-    protected function replaceClassName($name, $stub)
-    {
-        $class = ucfirst($name);
-        return str_replace('DummyClass', $class, $stub);
-    }
-
-    /**
-     * Replace the namespace of the namespace of the model.
-     *
-     * @param $namespace
-     * @param $stub
-     * @return mixed
-     */
-    protected function replaceModelNamespace($namespace, $stub)
-    {
-        return str_replace('DummyModelNamespace', ucfirst($namespace), $stub);
-    }
-
-    /**
-     * Replace the namespace
-     *
-     * @param $namespace
-     * @param $stub
-     * @return mixed
-     */
-    protected function replaceNamespace($namespace, $stub)
-    {
-        return str_replace('DummyNamespace', ucfirst($namespace), $stub);
-    }
-
-    /**
-     * Replace the namespace of the namespace of the repository.
-     *
-     * @param $namespace
-     * @param $stub
-     * @return mixed
-     */
-    protected function replaceRepositoryNamespace($namespace, $stub)
-    {
-        return str_replace('DummyNamespaceRepository', ucfirst($namespace), $stub);
-    }
-
-    /**
-     * Replace the namespace of the namespace of the resource.
-     *
-     * @param $namespace
-     * @param $stub
-     * @return mixed
-     */
-    protected function replaceResourceNamespace($namespace, $stub)
-    {
-        return str_replace('DummyNamespaceResource', ucfirst($namespace), $stub);
-    }
-
-    /**
-     * Read a stub file by logical name from this package stubs directory.
+     * Get the content of a stub, preferring a published override in stubs/kernel.
      */
     protected function getStubContent(string $name): string
     {
-        $path = __DIR__ . '/stubs/' . str_replace('.', '/', $name) . '.stub';
-        if (!file_exists($path)) {
-            throw new \RuntimeException('Stub not found: ' . $path);
+        $override = $this->laravel->basePath(self::STUBS_OVERRIDE_DIRECTORY.'/'.$name.'.stub');
+        $path = is_file($override) ? $override : __DIR__.'/stubs/'.$name.'.stub';
+
+        if (! is_file($path)) {
+            throw new RuntimeException("Stub not found: {$name}");
         }
+
         return (string) file_get_contents($path);
     }
 
     /**
-     * Write content to a file, creating parent directories when needed.
+     * Replace placeholders in a stub (longest placeholders are replaced first).
+     *
+     * @param  array<string, string>  $replacements
      */
-    protected function writeFile(string $path, string $content): void
+    protected function render(string $stub, array $replacements): string
     {
-        $dir = dirname($path);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
-        file_put_contents($path, $content);
+        return strtr($stub, $replacements);
     }
 
     /**
-     * Ask whether a file should be replaced unless --force is provided.
+     * Write a generated file, asking before overwriting an existing one.
      */
-    protected function shouldReplaceFile(string $path, string $question = 'Replace file? [y/n]'): bool
+    protected function generate(string $path, string $content, string $label): bool
     {
-        if (!file_exists($path)) {
+        $relative = $this->relativePath($path);
+
+        if ($this->isDryRun()) {
+            $this->line("<comment>[dry-run]</comment> {$label} would be written to {$relative}");
+            $this->line($content);
+
             return true;
         }
-        if ($this->option('force')) {
+
+        if (is_file($path) && ! $this->isForced()) {
+            $replace = $this->input->isInteractive()
+                && $this->confirm("{$label} already exists ({$relative}). Replace it?", false);
+
+            if (! $replace) {
+                $this->warn("{$label} skipped: {$relative} already exists.");
+
+                return false;
+            }
+        }
+
+        $this->files()->ensureDirectoryExists(dirname($path));
+        $this->files()->put($path, $content);
+        $this->info("{$label} created: {$relative}");
+
+        return true;
+    }
+
+    protected function isForced(): bool
+    {
+        return $this->hasOption('force') && (bool) $this->option('force');
+    }
+
+    protected function isDryRun(): bool
+    {
+        return $this->hasOption('dry-run') && (bool) $this->option('dry-run');
+    }
+
+    protected function relativePath(string $path): string
+    {
+        return ltrim(Str::after($path, $this->laravel->basePath()), '/\\');
+    }
+
+    /**
+     * Split "Admin/UserRepository" or "Admin\UserRepository" into [sub-namespace, class].
+     *
+     * @return array{0: string, 1: string}
+     */
+    protected function parseName(string $name): array
+    {
+        $name = trim(str_replace('/', '\\', $name), '\\');
+
+        if ($name === '' || ! preg_match('/^[A-Za-z_][A-Za-z0-9_\\\\]*$/', $name)) {
+            throw new InvalidArgumentException("Invalid class name \"{$name}\".");
+        }
+
+        $parts = array_map(fn (string $part) => Str::studly($part), explode('\\', $name));
+        $class = array_pop($parts);
+
+        return [implode('\\', $parts), $class];
+    }
+
+    /**
+     * Resolve the file path, namespace and class name of a class to generate.
+     *
+     * @param  string  $folder  Folder relative to app/ (or to the module), e.g. "Http/Resources".
+     * @return array{path: string, namespace: string, class: string}
+     */
+    protected function classTarget(string $name, string $folder, ?string $module = null): array
+    {
+        [$sub, $class] = $this->parseName($name);
+        $subPath = $sub === '' ? '' : str_replace('\\', '/', $sub).'/';
+
+        if ($module) {
+            $directory = $this->modulePath($module, $folder);
+            $namespace = $this->moduleNamespace($module, $folder);
+        } else {
+            $directory = $this->laravel->path($folder);
+            $namespace = $this->rootNamespace().'\\'.str_replace('/', '\\', $folder);
+        }
+
+        return [
+            'path' => rtrim($directory, '/').'/'.$subPath.$class.'.php',
+            'namespace' => $namespace.($sub === '' ? '' : '\\'.$sub),
+            'class' => $class,
+        ];
+    }
+
+    protected function rootNamespace(): string
+    {
+        return rtrim($this->laravel->getNamespace(), '\\');
+    }
+
+    protected function moduleName(string $module): string
+    {
+        return Str::studly($module);
+    }
+
+    protected function moduleBasePath(string $module): string
+    {
+        return $this->laravel->basePath('Modules/'.$this->moduleName($module));
+    }
+
+    protected function moduleExists(string $module): bool
+    {
+        return is_dir($this->moduleBasePath($module));
+    }
+
+    /**
+     * nwidart/laravel-modules < 10 puts classes at the module root (Entities, Http, ...),
+     * version 10+ puts them in an app/ folder (Models, Http, ...).
+     */
+    protected function isLegacyModule(string $module): bool
+    {
+        return ! is_dir($this->moduleBasePath($module).'/app');
+    }
+
+    protected function ensureModuleExists(string $module): void
+    {
+        if (! $this->moduleExists($module)) {
+            throw new InvalidArgumentException("The module \"{$this->moduleName($module)}\" does not exist.");
+        }
+    }
+
+    /**
+     * Absolute path of a class folder inside a module.
+     */
+    protected function modulePath(string $module, string $folder = ''): string
+    {
+        $this->ensureModuleExists($module);
+
+        $base = $this->moduleBasePath($module).($this->isLegacyModule($module) ? '' : '/app');
+
+        return rtrim($base.'/'.trim($folder, '/'), '/');
+    }
+
+    protected function moduleNamespace(string $module, string $folder = ''): string
+    {
+        $namespace = 'Modules\\'.$this->moduleName($module);
+        $folder = trim(str_replace('/', '\\', $folder), '\\');
+
+        return $folder === '' ? $namespace : $namespace.'\\'.$folder;
+    }
+
+    protected function modelsFolder(?string $module = null): string
+    {
+        return $module && $this->isLegacyModule($module) ? 'Entities' : 'Models';
+    }
+
+    /**
+     * Resolve a model option (e.g. "User", "Admin/User", "App\Models\User") to a FQCN.
+     */
+    protected function resolveModel(string $model, ?string $module = null): string
+    {
+        $model = trim(str_replace('/', '\\', $model), '\\');
+
+        if (Str::startsWith($model, [$this->rootNamespace().'\\', 'Modules\\'])) {
+            return $model;
+        }
+
+        [$sub, $class] = $this->parseName($model);
+        $base = $module
+            ? $this->moduleNamespace($module, $this->modelsFolder($module))
+            : $this->rootNamespace().'\\Models';
+
+        return $base.($sub === '' ? '' : '\\'.$sub).'\\'.$class;
+    }
+
+    /**
+     * Check if a model exists, either autoloadable or as a file.
+     */
+    protected function modelExists(string $fqcn): bool
+    {
+        if (class_exists($fqcn)) {
             return true;
         }
-        do {
-            $input = strtolower($this->ask($question));
-        } while ($input !== 'y' && $input !== 'n');
-        return $input === 'y';
-    }
 
-    /**
-     * Simple success output helper.
-     */
-    protected function displaySuccess(string $message, string $path): void
-    {
-        $this->info($message);
-        $this->line(' → ' . $path);
-    }
+        $root = $this->rootNamespace().'\\';
 
-    /**
-     * Ensure a directory exists.
-     */
-    protected function ensureDirectoryExists(string $directory): void
-    {
-        if (!file_exists($directory)) {
-            mkdir($directory, 0755, true);
-        }
-    }
-
-    /**
-     * Basic filename validation for ClassMakeCommand.
-     */
-    protected function isValidFilename(string $filename): bool
-    {
-        return (bool) preg_match('#^[A-Za-z0-9_\\\\/\.-]+$#', $filename);
-    }
-
-    /**
-     * Create folders if necessary for file paths.
-     *
-     * @param array $pathParts
-     * @param string $basePath
-     * @return void
-     */
-    protected function createFoldersIfNecessary(array $pathParts, string $basePath): void
-    {
-        $folder = $basePath;
-        for ($i = 0; $i < count($pathParts) - 1; $i++) {
-            $folder .= DIRECTORY_SEPARATOR . $pathParts[$i];
-            if (!is_dir($folder)) {
-                mkdir($folder, 0755, true);
-            }
-        }
-    }
-
-    /**
-     * Check if a repository file exists.
-     *
-     * @param $repository
-     * @param null $module
-     * @return bool
-     */
-    protected function repositoryFileExists($repository, $module = null): bool
-    {
-        if (is_null($module)) {
-            $repositoryName = ucfirst(basename(str_replace('\\', '/', $repository)));
-            return file_exists(app_path('Repositories/'.$repositoryName.'.php'));
+        if (Str::startsWith($fqcn, $root)) {
+            return is_file($this->laravel->path(str_replace('\\', '/', Str::after($fqcn, $root)).'.php'));
         }
 
-        $path = base_path('Modules/'.ucfirst($module).'/Repositories/'.ucfirst(basename(str_replace('\\', '/', $repository))).'.php');
-        return file_exists($path);
-    }
-
-    /**
-     * Set the right name and namespace.
-     *
-     * @param $model
-     * @param $namespace
-     * @param $module
-     * @return void
-     */
-    protected function setModelAndNamespace(&$model, &$namespace, &$module)
-    {
-        $exploded = str_contains($model, '/') ? explode('/', $model) : explode('\\', $model);
-        $model = Arr::last($exploded);
-        $namespace = '';
-        $module = '';
-
-        for ($i = 0; $i < count($exploded) - 1; $i++) {
-            if (!empty($module)) {
-                $namespace .= $module.'\\'.$exploded[$i].'\\'.'Entities\\';
-            } else {
-                $namespace .= $exploded[$i].'\\';
-            }
+        if (preg_match('/^Modules\\\\([^\\\\]+)\\\\(.+)$/', $fqcn, $matches) && $this->moduleExists($matches[1])) {
+            return is_file($this->modulePath($matches[1], str_replace('\\', '/', $matches[2])).'.php');
         }
 
-        $namespace = Str::replaceLast('\\','', $namespace);
+        return false;
     }
 
-    /**
-     * Set the right name and namespace.
-     *
-     * @param $repository
-     * @param $namespace
-     * @param $module
-     * @return void
-     */
-    protected function setRepositoryAndNamespace(&$repository, &$namespace, &$module)
+    protected function classBasename(string $fqcn): string
     {
-        $exploded = str_contains($repository, '/') ? explode('/', $repository) : explode('\\', $repository);
-        $repository = Arr::last($exploded);
-        $namespace = '';
-        $module = '';
-
-        for ($i = 0; $i < count($exploded) - 1; $i++) {
-            if (!empty($module)) {
-                $namespace .= $module.'\\'.$exploded[$i].'\\'.'Repositories\\';
-            } else {
-                $namespace .= $exploded[$i].'\\';
-            }
-        }
-
-        $namespace = Str::replaceLast('\\','', $namespace);
+        return class_basename($fqcn);
     }
-
-    /**
-     * Check if a model file exists.
-     *
-     * @param $model
-     * @param null $module
-     * @return bool
-     */
-    protected function modelFileExists($model, $module = null): bool
-    {
-        if (is_null($module)) {
-            $modelName = ucfirst(basename(str_replace('\\', '/', $model)));
-            return file_exists(app_path('Models/'.$modelName.'.php'));
-        }
-
-        $path = base_path('Modules/'.ucfirst($module).'/Entities/'.ucfirst(basename(str_replace('\\', '/', $model))).'.php');
-        return file_exists($path);
-    }
-
-
-
 }

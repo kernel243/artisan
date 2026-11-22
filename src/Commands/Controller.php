@@ -2,151 +2,103 @@
 
 namespace Kernel243\Artisan\Commands;
 
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 class Controller extends BaseCommand
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'kernel:controller {name}
-    {-r : The repository on which the controller will be based on}
-    {-R : The resource on which the controller will be based on}
-    {--model= : The model on which the controller class will be based on}
-    {--module= : The module on which the controller class will be based on}';
+    protected $signature = 'kernel:controller {name : The controller class name (e.g. PostController)}
+                            {--model= : Generate an API controller based on this model, its repository and its resource}
+                            {--module= : The nwidart module where the controller will be created}
+                            {--force : Overwrite the files if they already exist}
+                            {--dry-run : Display the generated files without writing them}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Create a new controller class';
+    protected $description = 'Create a new controller class (API controller backed by a repository and a resource when --model is given)';
 
-    /**
-     * Create a new command instance.
-     *
-     * @return void
-     */
-    public function __construct()
+    public function handle(): int
     {
-        parent::__construct();
-    }
+        try {
+            $module = $this->option('module') ?: null;
+            $target = $this->classTarget($this->argument('name'), 'Http/Controllers', $module);
+            $baseController = $this->baseControllerClass($module);
+            $model = $this->option('model');
 
-    /**
-     * Retrieve the stub content from the controller stub file.
-     *
-     * @return mixed
-     */
-    protected function getStub()
-    {
-        return file_get_contents(__DIR__.'/stubs/controller.stub');
-    }
+            if (! $model) {
+                $content = $this->render($this->getStubContent('empty.controller'), [
+                    'DummyNamespace' => $target['namespace'],
+                    'DummyClass' => $target['class'],
+                    'DummyBaseControllerClass' => $baseController,
+                    'DummyBaseController' => $this->classBasename($baseController),
+                ]);
 
-    protected function getEmptyStub()
-    {
-        return file_get_contents(__DIR__.'/stubs/empty.controller.stub');
-    }
+                $this->generate($target['path'], $content, 'Controller');
 
-    /**
-     * Rewrite actually the content in the file.
-     * @param null $module
-     * @param $filename
-     * @param $content
-     */
-    protected function putInFile($filename, $content, $module = null)
-    {
-        if (!is_null($module)) {
-            $modulePath = base_path('Modules/'.$module.'/Http/Controllers');
-            if (!is_dir($modulePath)) {
-                mkdir($modulePath, 0755, true);
+                return self::SUCCESS;
             }
-        } else {
-            if (!is_dir(app_path('/Http/Controllers'))) {
-                mkdir(app_path('/Http/Controllers'), 0755, true);
+
+            $modelClass = $this->resolveModel($model, $module);
+
+            if (! $this->modelExists($modelClass)) {
+                throw new InvalidArgumentException("The model \"{$modelClass}\" does not exist.");
             }
-        }
 
-        file_put_contents($filename, $content);
-    }
+            $modelName = $this->classBasename($modelClass);
+            $repository = $this->classTarget($modelName.'Repository', 'Repositories', $module);
+            $resource = $this->classTarget($modelName.'Resource', 'Http/Resources', $module);
 
-    /**
-     * Execute the console command.
-     *
-     * @return void
-     */
-    public function handle()
-    {
-        $name = $this->argument('name');
-        $model = $this->option('model');
-        $repository = $this->argument('-r');
-        $resource = $this->argument('-R');
-        $module = $this->option('module');
-        $modelNamespace = 'App\\Models';
-        $repositoryNamespace = 'App\\Repositories';
-        $resourceNamespace = 'App\\Http\\Resources';
-        $namespace = 'App\\Http\\Controllers';
-
-        if (empty($name)) {
-            $this->error('Please the name of controller is expected.');
-        } else {
-            $content = null;
-
-            if (is_null($model)) {
-                $content = $this->replaceClassName($name, $this->getEmptyStub());
-            } else {
-                if (Str::contains($model, ['\\', '/'])) {
-                    $this->setModelAndNamespace($model, $modelNamespace, $module);
-                }
-
-                if (is_null($module)) {
-                    if ($this->modelFileExists($modelNamespace.'\\'.$model)) {
-                        if ($repository) {
-                            if (!$this->repositoryFileExists($repositoryNamespace . '\\' . $model . 'Repository')) {
-                                $this->call('make:repository', [
-                                    'name' => ucfirst($model) . 'Repository',
-                                    '--model' => $model
-                                ]);
-                                $this->output->success('Repository  created .');
-
-                            }
-
-                            $repositoryName = $model . 'Repository';
-                            $content = $this->replaceRepositoryNamespace($repositoryNamespace, $this->getStub());
-                            $content = $this->replaceNamespace($namespace, $content);
-                            $content = $this->replaceModelNamespace($modelNamespace, $content);
-                            $content = $this->replaceResourceNamespace($resourceNamespace, $content);
-                            $content = $this->replaceModelName($model, $content);
-                            $content = $this->replacePropertyName($repositoryName, $content);
-                            $content = $this->replaceClassName(ucfirst(Str::camel($name)), $content);
-                        }
-                    } else {
-                        $this->output->error('The specified model "'.$this->option('model').'" does not exist.');
-                    }
-                } else {
-                    if ($this->moduleExists(ucfirst($module))) {
-                        if ($this->modelFileExists($model, $module)) {
-                            $modelNameSpace = 'Modules\\'.$module.'\\Entities';
-                            $namespace = 'Modules\\'.ucfirst($module).'\\Repositories';
-                            $content = $this->replaceNamespace($namespace, $this->getStub());
-                            $content = $this->replaceModelNamespace($modelNameSpace, $content);
-                            $content = $this->replaceModelName($model, $content);
-                            $content = $this->replacePropertyName($name, $content);
-                            $content = $this->replaceClassName($name, $content);
-                        } else {
-                            $this->output->error('The specified model "'.$this->option('model').'" does not exist.');
-                        }
-                    } else {
-                        $this->output->error('The specified module "'.$this->option('module').'" does not exist.');
-                    }
-                }
+            if (! is_file($repository['path'])) {
+                $this->call('kernel:repository', array_filter([
+                    'name' => $repository['class'],
+                    '--model' => $modelClass,
+                    '--module' => $module,
+                    '--dry-run' => $this->isDryRun(),
+                ]));
             }
+
+            if (! is_file($resource['path'])) {
+                $this->call('kernel:resource', array_filter([
+                    'name' => $resource['class'],
+                    '--module' => $module,
+                    '--dry-run' => $this->isDryRun(),
+                ]));
+            }
+
+            $content = $this->render($this->getStubContent('controller'), [
+                'DummyNamespace' => $target['namespace'],
+                'DummyClass' => $target['class'],
+                'DummyBaseControllerClass' => $baseController,
+                'DummyBaseController' => $this->classBasename($baseController),
+                'DummyModelClass' => $modelClass,
+                'DummyModelProperty' => Str::camel($modelName),
+                'DummyModel' => $modelName,
+                'DummyRepositoryClass' => $repository['namespace'].'\\'.$repository['class'],
+                'DummyRepositoryProperty' => Str::camel($repository['class']),
+                'DummyRepository' => $repository['class'],
+                'DummyResourceClass' => $resource['namespace'].'\\'.$resource['class'],
+                'DummyResource' => $resource['class'],
+            ]);
+
+            $this->generate($target['path'], $content, 'Controller');
+
+            return self::SUCCESS;
+        } catch (InvalidArgumentException $e) {
+            $this->error($e->getMessage());
+
+            return self::FAILURE;
         }
     }
 
+    /**
+     * Use the application's base controller when there is one, the framework one otherwise.
+     */
+    protected function baseControllerClass(?string $module): string
+    {
+        $appController = $this->rootNamespace().'\\Http\\Controllers\\Controller';
+
+        if (! $module && (class_exists($appController) || is_file($this->laravel->path('Http/Controllers/Controller.php')))) {
+            return $appController;
+        }
+
+        return 'Illuminate\\Routing\\Controller';
+    }
 }
-
-
-
