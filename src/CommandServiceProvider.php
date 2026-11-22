@@ -23,7 +23,16 @@ class CommandServiceProvider extends ServiceProvider
         Commands\Lang::class,
         Commands\CrudMakeCommand::class,
         Commands\ResourceMakeCommand::class,
+        Commands\ActionMakeCommand::class,
+        Commands\DataMakeCommand::class,
+        Commands\RequestMakeCommand::class,
+        Commands\EnumMakeCommand::class,
     ];
+
+    public function register(): void
+    {
+        $this->mergeConfigFrom(__DIR__.'/../config/kernel-artisan.php', 'kernel-artisan');
+    }
 
     public function boot(): void
     {
@@ -36,5 +45,9 @@ class CommandServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/Commands/stubs' => $this->app->basePath(Commands\BaseCommand::STUBS_OVERRIDE_DIRECTORY),
         ], 'kernel-stubs');
+
+        $this->publishes([
+            __DIR__.'/../config/kernel-artisan.php' => $this->app->configPath('kernel-artisan.php'),
+        ], 'kernel-config');
     }
 }

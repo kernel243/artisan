@@ -108,7 +108,7 @@ class ResourceMakeCommand extends BaseCommand
             'DummyModel' => $model,
             'DummyFormFields' => $this->resourceFormFields($fields),
             'DummyTableColumns' => $this->resourceTableColumns($fields),
-            'DummyValidationRules' => $this->validationRules($fields),
+            'DummyValidationRules' => $this->resourceValidationRules($fields),
         ]), 'Resource');
     }
 
@@ -176,7 +176,7 @@ class ResourceMakeCommand extends BaseCommand
     /**
      * @param  list<array{name: string, type: string}>  $fields
      */
-    protected function validationRules(array $fields): string
+    protected function resourceValidationRules(array $fields): string
     {
         if ($fields === []) {
             return "            // 'field' => 'required',";

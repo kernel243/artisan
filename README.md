@@ -40,6 +40,10 @@ All commands are prefixed with `kernel:`. The former `make:*` names are kept as 
 | `kernel:file`          | `make:file`          | An empty file                                          |
 | `kernel:crud`          | `make:crud`          | A Blade CRUD                                           |
 | `kernel:resource-crud` | `make:resource-crud` | A CRUD driven by a Resource class                      |
+| `kernel:action`        | –                    | An action class (one business operation per class)    |
+| `kernel:data`          | –                    | A spatie/laravel-data DTO (full or partial update)     |
+| `kernel:request`       | –                    | `Store<Model>Request` and `Update<Model>Request`       |
+| `kernel:enum`          | –                    | A string-backed enum with `label()` and `HasOptions`   |
 
 Every generator accepts:
 
@@ -128,6 +132,67 @@ Generates a CRUD driven by a Resource class (form fields, table columns and vali
 ```bash
 php artisan kernel:resource-crud Product --fields="title:string,description:text"
 ```
+
+### Action
+
+```bash
+php artisan kernel:action CreatePost --model=Post          # app/Actions/Posts/CreatePostAction.php
+php artisan kernel:action UpdatePost --model=Post
+php artisan kernel:action DeletePost --model=Post
+php artisan kernel:action Billing/SendMonthlyInvoices      # plain action
+```
+
+The kind of action is guessed from the verb (`Create`/`Store`/`Add`, `Update`/`Edit`, `Delete`/`Destroy`/`Remove`) or forced with `--type=create|update|delete|plain`. Create and update actions take the `<Model>Data` DTO when spatie/laravel-data is installed (`<Model>UpdateData` for updates when it exists), or an array with `--no-data`, and run in `DB::transaction()`.
+
+### Data (DTO)
+
+```bash
+php artisan kernel:data PostData --model=Post                          # fields read from the model
+php artisan kernel:data PostData --fields="title:string,price:decimal,published_at:datetime?"
+php artisan kernel:data PostUpdateData --model=Post --update            # Optional|... properties
+```
+
+### Form requests
+
+```bash
+php artisan kernel:request Post --fields="title:string,email:email:unique,bio:text?,author_id:foreignId"
+php artisan kernel:request Post --only=update
+```
+
+Creates `app/Http/Requests/Posts/StorePostRequest.php` and `UpdatePostRequest.php`: array rules, `Rule::unique()->ignore()` on update, `Rule::exists()` for foreign keys, and `messages()` / `attributes()` to translate.
+
+### Enum
+
+```bash
+php artisan kernel:enum PaymentStatus --cases="pending,paid,failed"
+```
+
+Generates a string-backed enum (`case Pending = 'pending';`), a `label()` method and the `App\Enums\Concerns\HasOptions` trait (`values()`, `options()` for selects).
+
+## Fields
+
+`--fields` takes `name:type[:modifier...]` separated by commas:
+
+- types: `string`, `text`, `email`, `password`, `url`, `phone`, `uuid`, `integer`, `foreignId`, `decimal`, `float`, `boolean`, `date`, `datetime`, `json`, `enum`;
+- modifiers: `nullable` (or a trailing `?`: `bio:text?`) and `unique`.
+
+Without `--fields`, `kernel:data` and `kernel:request` read the fillable attributes and the casts of the existing model.
+
+## Configuration
+
+```bash
+php artisan vendor:publish --tag=kernel-config
+```
+
+`config/kernel-artisan.php` aligns the generated code with an existing project:
+
+| Key | Default | Effect |
+|-----|---------|--------|
+| `actions.suffix` | `'Action'` | `CreatePostAction`; `''` gives `CreatePost` |
+| `actions.method` | `'handle'` | `handle`, `__invoke` or `execute` |
+| `actions.transaction` | `true` | Wrap create / update actions in `DB::transaction()` |
+| `data.enabled` | `true` | Use DTOs in actions when spatie/laravel-data is installed |
+| `requests.authorize_in_controller` | `true` | `authorize()` returns `true`; `false` generates `$this->user()?->can('posts.create')` |
 
 ## Modules
 

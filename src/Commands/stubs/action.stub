@@ -1,0 +1,16 @@
+<?php
+
+namespace DummyNamespace;
+
+DummyImports
+
+/**
+ * DummyDescription
+ */
+class DummyClass
+{
+    public function DummyMethod(DummySignature): DummyReturn
+    {
+DummyBody
+    }
+}

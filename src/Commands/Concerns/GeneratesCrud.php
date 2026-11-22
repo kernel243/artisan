@@ -3,7 +3,6 @@
 namespace Kernel243\Artisan\Commands\Concerns;
 
 use Illuminate\Support\Str;
-use InvalidArgumentException;
 use Kernel243\Artisan\Commands\BaseCommand;
 
 /**
@@ -13,35 +12,7 @@ use Kernel243\Artisan\Commands\BaseCommand;
  */
 trait GeneratesCrud
 {
-    /**
-     * Parse "title:string,body:text" into a list of fields.
-     *
-     * @return list<array{name: string, type: string}>
-     */
-    protected function parseFields(?string $fields): array
-    {
-        if (blank($fields)) {
-            return [];
-        }
-
-        $parsed = [];
-
-        foreach (explode(',', $fields) as $field) {
-            $parts = array_map('trim', explode(':', $field));
-
-            if ($parts[0] === '') {
-                continue;
-            }
-
-            if (! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $parts[0])) {
-                throw new InvalidArgumentException("Invalid field name \"{$parts[0]}\".");
-            }
-
-            $parsed[] = ['name' => $parts[0], 'type' => strtolower($parts[1] ?? 'string')];
-        }
-
-        return $parsed;
-    }
+    use InteractsWithFields;
 
     /**
      * @return array{model: string, variable: string, plural: string, kebab: string, table: string}
@@ -163,10 +134,5 @@ trait GeneratesCrud
         if ($this->option('tailwind-config') && ! is_file($path)) {
             $this->generate($path, $this->getStubContent('tailwind.config'), 'Tailwind config');
         }
-    }
-
-    protected function fieldLabel(string $field): string
-    {
-        return Str::ucfirst(str_replace('_', ' ', $field));
     }
 }
