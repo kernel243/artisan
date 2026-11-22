@@ -2,40 +2,39 @@
 
 namespace Kernel243\Artisan;
 
+use Illuminate\Console\Command;
 use Illuminate\Support\ServiceProvider;
 
 class CommandServiceProvider extends ServiceProvider
 {
     /**
-     * Bootstrap the application services.
+     * The commands provided by the package.
      *
-     * @return void
+     * @var list<class-string<Command>>
      */
+    public const COMMANDS = [
+        Commands\Repository::class,
+        Commands\Service::class,
+        Commands\Resource::class,
+        Commands\Controller::class,
+        Commands\View::class,
+        Commands\ClassMakeCommand::class,
+        Commands\File::class,
+        Commands\Lang::class,
+        Commands\CrudMakeCommand::class,
+        Commands\ResourceMakeCommand::class,
+    ];
+
     public function boot(): void
     {
-        if ($this->app->runningInConsole()) {
-            $this->commands([
-                Commands\Repository::class,
-                Commands\Service::class,
-                Commands\File::class,
-                Commands\View::class,
-                Commands\Resource::class,
-                Commands\Controller::class,
-                Commands\Lang::class,
-                Commands\ClassMakeCommand::class,
-                Commands\CrudMakeCommand::class,
-                Commands\ResourceMakeCommand::class,
-            ]);
+        if (! $this->app->runningInConsole()) {
+            return;
         }
-    }
 
-    /**
-     * Register the application services.
-     *
-     * @return void
-     */
-    public function register(): void
-    {
-        //
+        $this->commands(self::COMMANDS);
+
+        $this->publishes([
+            __DIR__.'/Commands/stubs' => $this->app->basePath(Commands\BaseCommand::STUBS_OVERRIDE_DIRECTORY),
+        ], 'kernel-stubs');
     }
 }
