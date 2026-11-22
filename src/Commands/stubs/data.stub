@@ -1,0 +1,16 @@
+<?php
+
+namespace DummyNamespace;
+
+DummyImports
+
+/**
+ * Données validées pour DummyModel, construites par DummyClass::from($request->validated()).
+ * Les propriétés reprennent le nom des colonnes (snake_case) pour être persistées telles quelles.
+ */
+class DummyClass extends Data
+{
+    public function __construct(
+DummyProperties
+    ) {}
+}

@@ -1,0 +1,22 @@
+<?php
+
+namespace DummyNamespace;
+
+use DummyHasOptionsClass;
+
+enum DummyClass: string
+{
+    use HasOptions;
+
+DummyCases
+
+    /**
+     * Libellé affiché dans l'interface.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+DummyLabels
+        };
+    }
+}
