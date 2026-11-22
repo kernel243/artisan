@@ -22,3 +22,10 @@
 # Git attributes for better diff and merge handling
 *.stub text eol=lf
 
+
+# Keep development files out of the distributed package
+/tests export-ignore
+/phpunit.xml export-ignore
+/CHANGELOG.md export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
