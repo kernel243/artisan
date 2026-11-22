@@ -3,6 +3,9 @@
 ## [1.0.0] - Unreleased
 
 ### Added
+- `kernel:action`, `kernel:data`, `kernel:request` and `kernel:enum` generators.
+- Publishable configuration `config/kernel-artisan.php` (`vendor:publish --tag=kernel-config`).
+- Richer `--fields` syntax (`nullable`, `unique`, `?`) and field inference from an existing model.
 - Support for Laravel 10, 11, 12 and 13 (PHP 8.2+), tested on Laravel 10.50, 11.57, 12.73 and 13.43.
 - `--force` and `--dry-run` options on every generator.
 - `kernel:class --kind=enum`.
