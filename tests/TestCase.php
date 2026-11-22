@@ -5,6 +5,7 @@ namespace Kernel243\Artisan\Tests;
 use Illuminate\Filesystem\Filesystem;
 use Kernel243\Artisan\CommandServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Spatie\LaravelData\LaravelDataServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
@@ -62,7 +63,11 @@ abstract class TestCase extends Orchestra
 
     protected function getPackageProviders($app)
     {
-        return [CommandServiceProvider::class];
+        return array_filter([
+            CommandServiceProvider::class,
+            // Lets the tests instantiate the generated DTOs.
+            class_exists(LaravelDataServiceProvider::class) ? LaravelDataServiceProvider::class : null,
+        ]);
     }
 
     protected function sandboxPath(string $path = ''): string
