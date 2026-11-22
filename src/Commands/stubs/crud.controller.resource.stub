@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Resources\DummyResourceClass;
-use App\Services\DummyService;
+use DummyServiceClass;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -24,7 +24,7 @@ class DummyController extends Controller
         $DummyPluralVariable = $this->service->getPaginated();
         $tableBuilder = app(\App\Builders\Table::class);
         $tableColumns = $this->resource->table($tableBuilder)->getColumns();
-        return view('DummyViewPath.index', compact('DummyPluralVariable', 'tableColumns'))
+        return view('DummyViewPath.index', compact('tableColumns') + ['items' => $DummyPluralVariable])
             ->with(['resourceName' => $this->resource->getName(), 'routePrefix' => $this->resource->getRoutePrefix()]);
     }
 
@@ -51,7 +51,7 @@ class DummyController extends Controller
         $detailFields = array_map(function ($field) {
             return ['name' => $field['name'], 'label' => $field['label'], 'type' => $field['type'] ?? 'text'];
         }, $formFields);
-        return view('DummyViewPath.show', compact('DummyVariable', 'detailFields'))
+        return view('DummyViewPath.show', compact('detailFields') + ['item' => $DummyVariable])
             ->with(['resourceName' => $this->resource->getName(), 'routePrefix' => $this->resource->getRoutePrefix()]);
     }
 
@@ -60,7 +60,7 @@ class DummyController extends Controller
         $DummyVariable = $this->service->getById($id);
         $formBuilder = app(\App\Builders\Form::class);
         $formFields = $this->resource->form($formBuilder)->getFields();
-        return view('DummyViewPath.edit', compact('DummyVariable', 'formFields'))
+        return view('DummyViewPath.edit', compact('formFields') + ['item' => $DummyVariable])
             ->with(['resourceName' => $this->resource->getName(), 'routePrefix' => $this->resource->getRoutePrefix()]);
     }
 

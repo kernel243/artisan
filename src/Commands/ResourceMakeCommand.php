@@ -3,300 +3,185 @@
 namespace Kernel243\Artisan\Commands;
 
 use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Kernel243\Artisan\Commands\Concerns\GeneratesCrud;
 
 class ResourceMakeCommand extends BaseCommand
 {
-    protected $signature = 'make:resource-crud {name}
-                            {--fields= : Comma-separated fields with their types (e.g., "title:string,name:string")}
-                            {--force : Overwrite existing files without confirmation}
-                            {--dry-run : Preview the file that would be created without actually creating it}';
+    use GeneratesCrud;
 
-    protected $description = 'Create a CRUD resource with Resource classes (Filament-inspired pattern)';
+    /**
+     * Generic views shared by every resource CRUD.
+     */
+    protected const VIEW_PATH = 'resources.crud';
 
-    protected function parseFields(?string $fields): array
-    {
-        if (empty($fields)) { return []; }
-        $parsed = [];
-        foreach (explode(',', $fields) as $field) {
-            $parts = explode(':', trim($field));
-            if (count($parts) === 2) { $parsed[] = ['name'=>trim($parts[0]), 'type'=>trim($parts[1])]; }
-        }
-        return $parsed;
-    }
+    protected $signature = 'kernel:resource-crud {name : The model name (e.g. Post)}
+                            {--fields= : Comma-separated fields with their types (e.g. "title:string,body:text")}
+                            {--tailwind-config : Also create a tailwind.config.js (Tailwind CSS v3) when missing}
+                            {--force : Overwrite the files if they already exist}
+                            {--dry-run : Display the generated files without writing them}';
+
+    protected $description = 'Create a CRUD driven by a Resource class (form, table and rules) with generic Blade views';
+
+    protected $aliases = ['make:resource-crud'];
 
     public function handle(): int
     {
-        $name = $this->argument('name');
-        $fields = $this->parseFields($this->option('fields'));
-        if (empty($name)) { $this->error('The name of the CRUD resource is required.'); return self::FAILURE; }
         try {
-            $this->generateBaseClasses();
-            $this->generateModel($name, $fields);
-            $this->generateRepository($name);
-            $this->generateService($name);
-            $this->generateController($name);
-            $this->generateResource($name, $fields);
-            $this->generateDefaultViews($name, $fields);
-            $this->generateRoutes($name);
-            $this->generateTailwindConfig();
-            $this->info('✓ Resource CRUD generated successfully!');
-            return self::SUCCESS;
-        } catch (\Exception $e) {
-            $this->error("Error: {$e->getMessage()}");
+            $names = $this->crudNames((string) $this->argument('name'));
+            $fields = $this->parseFields($this->option('fields'));
+        } catch (InvalidArgumentException $e) {
+            $this->error($e->getMessage());
+
             return self::FAILURE;
         }
+
+        $model = $names['model'];
+
+        $this->generateBaseClasses();
+        $this->generateModel($model, $fields);
+        $this->generateRepository($model);
+        $this->generateService($model);
+        $this->generateController($names);
+        $this->generateResource($names, $fields);
+        $this->generateDefaultViews();
+        $this->generateLayout();
+        $this->generateRoutes($model, $names['kebab']);
+        $this->generateTailwindConfig();
+
+        $this->info("Resource CRUD for {$model} generated.");
+
+        return self::SUCCESS;
     }
 
+    /**
+     * The base Resource class and the Form / Table builders are only created once.
+     */
     protected function generateBaseClasses(): void
     {
-        $this->generateBaseResource();
-        $this->generateFormBuilder();
-        $this->generateTableBuilder();
-    }
+        $classes = [
+            'Resources/Resource.php' => ['resource.base', 'Base resource'],
+            'Builders/Form.php' => ['form.builder', 'Form builder'],
+            'Builders/Table.php' => ['table.builder', 'Table builder'],
+        ];
 
-    protected function generateBaseResource(): void
-    {
-        $path = app_path('Resources/Resource.php');
-        if (file_exists($path)) return;
-        $stub = $this->getStubContent('resource.base');
-        if (!$this->shouldReplaceFile($path, 'Base Resource exists. Replace it? [y/n]')) return;
-        $this->ensureDirectoryExists(app_path('Resources'));
-        $this->writeFile($path, $stub);
-    }
+        foreach ($classes as $file => [$stub, $label]) {
+            $path = $this->laravel->path($file);
 
-    protected function generateFormBuilder(): void
-    {
-        $path = app_path('Builders/Form.php');
-        if (file_exists($path)) return;
-        $stub = $this->getStubContent('form.builder');
-        if (!$this->shouldReplaceFile($path, 'Form builder exists. Replace it? [y/n]')) return;
-        $this->ensureDirectoryExists(app_path('Builders'));
-        $this->writeFile($path, $stub);
-    }
-
-    protected function generateTableBuilder(): void
-    {
-        $path = app_path('Builders/Table.php');
-        if (file_exists($path)) return;
-        $stub = $this->getStubContent('table.builder');
-        if (!$this->shouldReplaceFile($path, 'Table builder exists. Replace it? [y/n]')) return;
-        $this->ensureDirectoryExists(app_path('Builders'));
-        $this->writeFile($path, $stub);
-    }
-
-    protected function generateModel(string $name, array $fields): void
-    {
-        $stub = $this->getStubContent('crud.model');
-        $stub = str_replace('DummyModel', ucfirst($name), $stub);
-        $stub = str_replace('DummyTable', Str::snake(Str::plural($name)), $stub);
-        $fillableString = empty($fields) ? "// 'field1', 'field2'" : implode(",\n        ", array_map(fn($f)=>"'{$f['name']}'", $fields));
-        $stub = str_replace('DummyFillable', $fillableString, $stub);
-        $path = app_path('Models/' . ucfirst($name) . '.php');
-        if (!$this->shouldReplaceFile($path, "Model {$name} exists. Replace it? [y/n]")) return;
-        $this->ensureDirectoryExists(app_path('Models'));
-        $this->writeFile($path, $stub);
-    }
-
-    protected function generateRepository(string $name): void
-    {
-        $modelName = ucfirst($name);
-        $stub = $this->getStubContent('repository');
-        $stub = str_replace('DummyModelNamespace', 'App', $stub);
-        $stub = str_replace('DummyModel', $modelName, $stub);
-        $stub = str_replace('DummyProperty', lcfirst(Str::camel($modelName)), $stub);
-        $stub = str_replace('class DummyClass', 'class ' . $modelName . 'Repository', $stub);
-        $path = app_path('Repositories/' . $modelName . 'Repository.php');
-        if (!$this->shouldReplaceFile($path, "Repository {$name} exists. Replace it? [y/n]")) return;
-        $this->ensureDirectoryExists(app_path('Repositories'));
-        $this->writeFile($path, $stub);
-    }
-
-    protected function generateService(string $name): void
-    {
-        $modelName = ucfirst($name);
-        $stub = $this->getStubContent('crud.service');
-        $stub = str_replace('DummyClass', $modelName . 'Service', $stub);
-        $stub = str_replace('DummyModel', $modelName, $stub);
-        $stub = str_replace('DummyRepository', $modelName . 'Repository', $stub);
-        $path = app_path('Services/' . $modelName . 'Service.php');
-        if (!$this->shouldReplaceFile($path, "Service {$name} exists. Replace it? [y/n]")) return;
-        $this->ensureDirectoryExists(app_path('Services'));
-        $this->writeFile($path, $stub);
-    }
-
-    protected function generateController(string $name): void
-    {
-        $modelName = ucfirst($name);
-        $variableName = lcfirst($name);
-        $pluralVariable = Str::plural($variableName);
-        $viewPath = 'resources.crud';
-        $stub = $this->getStubContent('crud.controller.resource');
-        $stub = str_replace(['DummyController','DummyService','DummyVariable','DummyPluralVariable','DummyViewPath','DummyResourceClass'],
-                            [$modelName.'Controller',$modelName.'Service',$variableName,$pluralVariable,$viewPath,$modelName.'Resource'], $stub);
-        $path = app_path('Http/Controllers/' . $modelName . 'Controller.php');
-        if (!$this->shouldReplaceFile($path, "Controller {$name} exists. Replace it? [y/n]")) return;
-        $this->ensureDirectoryExists(app_path('Http/Controllers'));
-        $this->writeFile($path, $stub);
-    }
-
-    protected function generateResource(string $name, array $fields): void
-    {
-        $modelName = ucfirst($name);
-        $resourceName = Str::plural($modelName);
-        $routePrefix = Str::kebab(Str::plural($name));
-        $stub = $this->getStubContent('crud.resource');
-        $stub = str_replace(['DummyResourceName','DummyResourceClass','DummyModel','DummyResourcePlural','DummyResourceKebab'],
-                            [$resourceName,$modelName.'Resource',$modelName,Str::plural($modelName),$routePrefix], $stub);
-        $formFields = $this->generateResourceFormFields($fields);
-        $stub = str_replace('DummyFormFields', $formFields, $stub);
-        $tableColumns = $this->generateResourceTableColumns($fields);
-        $stub = str_replace('DummyTableColumns', $tableColumns, $stub);
-        $validationRules = $this->generateValidationRules($fields);
-        $stub = str_replace('DummyValidationRules', $validationRules, $stub);
-        $path = app_path('Resources/' . $modelName . 'Resource.php');
-        if (!$this->shouldReplaceFile($path, "Resource {$name} exists. Replace it? [y/n]")) return;
-        $this->ensureDirectoryExists(app_path('Resources'));
-        $this->writeFile($path, $stub);
-    }
-
-    protected function generateDefaultViews(string $name, array $fields): void
-    {
-        $viewPath = 'resources.crud';
-        $resourceName = Str::plural(ucfirst($name));
-        $routePrefix = Str::kebab(Str::plural($name));
-        $this->ensureDirectoryExists(resource_path('views/resources/crud'));
-        $this->generateDefaultFormView($name, $fields, $viewPath);
-        $this->generateDefaultIndexView($name, $fields, $viewPath, $resourceName, $routePrefix);
-        $this->generateDefaultCreateView($name, $viewPath, $resourceName, $routePrefix);
-        $this->generateDefaultEditView($name, $viewPath, $resourceName, $routePrefix);
-        $this->generateDefaultShowView($name, $fields, $viewPath, $resourceName, $routePrefix);
-        $this->generateLayout();
-    }
-
-    protected function generateDefaultFormView(string $name, array $fields, string $viewPath): void
-    {
-        $path = resource_path('views/' . $viewPath . '/_form.blade.php');
-        if (!$this->shouldReplaceFile($path, '_form view exists. Replace it? [y/n]')) return;
-        $this->writeFile($path, $this->getStubContent('crud.views.default._form'));
-    }
-
-    protected function generateDefaultIndexView(string $name, array $fields, string $viewPath, string $resourceName, string $routePrefix): void
-    {
-        $stub = $this->getStubContent('crud.views.default.index');
-        $stub = str_replace(['{{ $resourceName }}','{{ $routePrefix }}'], [$resourceName,$routePrefix], $stub);
-        $path = resource_path('views/' . $viewPath . '/index.blade.php');
-        if (!$this->shouldReplaceFile($path, 'Index view exists. Replace it? [y/n]')) return;
-        $this->writeFile($path, $stub);
-    }
-
-    protected function generateDefaultCreateView(string $name, string $viewPath, string $resourceName, string $routePrefix): void
-    {
-        $stub = $this->getStubContent('crud.views.default.create');
-        $stub = str_replace(['{{ $resourceName }}','{{ $routePrefix }}'], ['New ' . ucfirst($name), $routePrefix], $stub);
-        $path = resource_path('views/' . $viewPath . '/create.blade.php');
-        if (!$this->shouldReplaceFile($path, 'Create view exists. Replace it? [y/n]')) return;
-        $this->writeFile($path, $stub);
-    }
-
-    protected function generateDefaultEditView(string $name, string $viewPath, string $resourceName, string $routePrefix): void
-    {
-        $stub = $this->getStubContent('crud.views.default.edit');
-        $stub = str_replace(['{{ $resourceName }}','{{ $routePrefix }}'], [ucfirst($name), $routePrefix], $stub);
-        $path = resource_path('views/' . $viewPath . '/edit.blade.php');
-        if (!$this->shouldReplaceFile($path, 'Edit view exists. Replace it? [y/n]')) return;
-        $this->writeFile($path, $stub);
-    }
-
-    protected function generateDefaultShowView(string $name, array $fields, string $viewPath, string $resourceName, string $routePrefix): void
-    {
-        $stub = $this->getStubContent('crud.views.default.show');
-        $stub = str_replace(['{{ $resourceName }}','{{ $routePrefix }}'], [ucfirst($name), $routePrefix], $stub);
-        $path = resource_path('views/' . $viewPath . '/show.blade.php');
-        if (!$this->shouldReplaceFile($path, 'Show view exists. Replace it? [y/n]')) return;
-        $this->writeFile($path, $stub);
-    }
-
-    protected function generateRoutes(string $name): void
-    {
-        $routesPath = base_path('routes/web.php');
-        if (!file_exists($routesPath)) { $this->warn('⚠ routes/web.php not found. Routes not added.'); return; }
-        $resourceName = Str::plural(ucfirst($name));
-        $controllerName = ucfirst($name) . 'Controller';
-        $routePrefix = Str::kebab(Str::plural($name));
-        $stub = $this->getStubContent('crud.routes');
-        $stub = str_replace(['{{ $resourceName }}','{{ $controllerName }}','{{ $routePrefix }}'], [$resourceName,$controllerName,$routePrefix], $stub);
-        $routesContent = file_get_contents($routesPath);
-        if (str_contains($routesContent, $routePrefix)) { $this->line('⚠ Routes already exist in web.php. Skipping.'); return; }
-        $routesContent .= "\n" . $stub;
-        if (!$this->option('dry-run')) {
-            file_put_contents($routesPath, $routesContent);
-            $this->line('✓ Routes added to web.php');
-        } else {
-            $this->line('[DRY RUN] Would add routes to web.php');
+            if (! is_file($path)) {
+                $this->generate($path, $this->getStubContent($stub), $label);
+            }
         }
     }
 
-    protected function generateLayout(): void
+    /**
+     * @param  array{model: string, variable: string, plural: string, kebab: string, table: string}  $names
+     */
+    protected function generateController(array $names): void
     {
-        $path = resource_path('views/layouts/app.blade.php');
-        if (file_exists($path)) return;
-        $stub = $this->getStubContent('crud.layout');
-        if (!$this->shouldReplaceFile($path, 'Layout exists. Replace it? [y/n]')) return;
-        $this->ensureDirectoryExists(resource_path('views/layouts'));
-        $this->writeFile($path, $stub);
+        $model = $names['model'];
+
+        $this->generate($this->laravel->path("Http/Controllers/{$model}Controller.php"), $this->render($this->getStubContent('crud.controller.resource'), [
+            'DummyController' => $model.'Controller',
+            'DummyServiceClass' => $this->rootNamespace().'\\Services\\'.$model.'Service',
+            'DummyService' => $model.'Service',
+            'DummyResourceClass' => $model.'Resource',
+            'DummyPluralVariable' => $names['plural'],
+            'DummyVariable' => $names['variable'],
+            'DummyViewPath' => self::VIEW_PATH,
+        ]), 'Controller');
     }
 
-    protected function generateTailwindConfig(): void
+    /**
+     * @param  array{model: string, variable: string, plural: string, kebab: string, table: string}  $names
+     * @param  list<array{name: string, type: string}>  $fields
+     */
+    protected function generateResource(array $names, array $fields): void
     {
-        $path = base_path('tailwind.config.js');
-        if (file_exists($path)) return;
-        $stub = $this->getStubContent('tailwind.config');
-        if (!$this->shouldReplaceFile($path, 'Tailwind config exists. Replace it? [y/n]')) return;
-        $this->writeFile($path, $stub);
+        $model = $names['model'];
+
+        $this->generate($this->laravel->path("Resources/{$model}Resource.php"), $this->render($this->getStubContent('crud.resource'), [
+            'DummyResourceName' => Str::plural($model),
+            'DummyResourceClass' => $model.'Resource',
+            'DummyResourcePlural' => Str::headline(Str::plural($model)),
+            'DummyResourceKebab' => $names['kebab'],
+            'DummyModel' => $model,
+            'DummyFormFields' => $this->resourceFormFields($fields),
+            'DummyTableColumns' => $this->resourceTableColumns($fields),
+            'DummyValidationRules' => $this->validationRules($fields),
+        ]), 'Resource');
     }
 
-    protected function generateResourceFormFields(array $fields): string
+    protected function generateDefaultViews(): void
     {
-        if (empty($fields)) { return "            // Form::text('name', 'Name'),"; }
-        $lines = [];
+        $directory = $this->laravel->resourcePath('views/'.str_replace('.', '/', self::VIEW_PATH));
+
+        foreach (['_form', 'index', 'create', 'edit', 'show'] as $view) {
+            $path = "{$directory}/{$view}.blade.php";
+
+            if (! is_file($path) || $this->isForced()) {
+                $this->generate($path, $this->getStubContent("crud.views.default.{$view}"), "Generic {$view} view");
+            }
+        }
+    }
+
+    /**
+     * @param  list<array{name: string, type: string}>  $fields
+     */
+    protected function resourceFormFields(array $fields): string
+    {
+        if ($fields === []) {
+            return "            // Form::text('name', 'Name'),";
+        }
+
+        return implode("\n", array_map(function (array $field) {
+            $type = match ($field['type']) {
+                'text', 'textarea', 'longtext' => 'textarea',
+                'email' => 'email',
+                'boolean', 'bool', 'tinyint' => 'checkbox',
+                default => 'text',
+            };
+
+            return "            Form::{$type}('{$field['name']}', '{$this->fieldLabel($field['name'])}'),";
+        }, $fields));
+    }
+
+    /**
+     * @param  list<array{name: string, type: string}>  $fields
+     */
+    protected function resourceTableColumns(array $fields): string
+    {
+        if ($fields === []) {
+            return "            // Table::text('id', 'ID'),";
+        }
+
+        $columns = ["            Table::text('id', 'ID'),"];
+
         foreach ($fields as $field) {
-            $fieldName = $field['name'];
-            $fieldLabel = ucfirst(str_replace('_', ' ', $fieldName));
-            $type = $this->getFormFieldType($field['type']);
-            $lines[] = "            Form::{$type}('{$fieldName}', '{$fieldLabel}'),";
-        }
-        return implode("\n", $lines);
-    }
+            $type = match ($field['type']) {
+                'decimal', 'integer', 'int', 'bigint', 'float', 'double' => 'number',
+                'boolean', 'bool', 'tinyint' => 'boolean',
+                'datetime', 'date', 'timestamp' => 'datetime',
+                default => 'text',
+            };
 
-    protected function generateResourceTableColumns(array $fields): string
-    {
-        if (empty($fields)) { return "            // Table::text('id', 'ID'),"; }
-        $columns = ["            Table::text('id', 'ID'),"];        
-        foreach ($fields as $field) {
-            $fieldName = $field['name'];
-            $fieldLabel = ucfirst(str_replace('_', ' ', $fieldName));
-            $type = $this->getTableColumnType($field['type']);
-            $columns[] = "            Table::{$type}('{$fieldName}', '{$fieldLabel}'),";
+            $columns[] = "            Table::{$type}('{$field['name']}', '{$this->fieldLabel($field['name'])}'),";
         }
-        $columns[] = "            Table::actions(),";
+
+        $columns[] = '            Table::actions(),';
+
         return implode("\n", $columns);
     }
 
-    protected function generateValidationRules(array $fields): string
+    /**
+     * @param  list<array{name: string, type: string}>  $fields
+     */
+    protected function validationRules(array $fields): string
     {
-        if (empty($fields)) { return "            // 'field' => 'required',"; }
-        return implode("\n", array_map(fn($f)=>"            '{$f['name']}' => 'required',", $fields));
-    }
+        if ($fields === []) {
+            return "            // 'field' => 'required',";
+        }
 
-    protected function getFormFieldType(string $type): string
-    {
-        $map = ['string'=>'text','text'=>'textarea','textarea'=>'textarea','email'=>'email','boolean'=>'checkbox','tinyint'=>'checkbox'];
-        return $map[strtolower($type)] ?? 'text';
-    }
-
-    protected function getTableColumnType(string $type): string
-    {
-        $map = ['decimal'=>'number','integer'=>'number','bigint'=>'number','boolean'=>'boolean','tinyint'=>'boolean','datetime'=>'datetime','date'=>'datetime','timestamp'=>'datetime'];
-        return $map[strtolower($type)] ?? 'text';
+        return implode("\n", array_map(fn (array $field) => "            '{$field['name']}' => 'required',", $fields));
     }
 }

@@ -3,102 +3,74 @@
 namespace Kernel243\Artisan\Commands;
 
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 class ClassMakeCommand extends BaseCommand
 {
-    protected $signature = 'make:class {filename}
-                            {--kind=class : The type of file to create (class, trait, or interface)}
-                            {--separator=\\ : Character used to separate file and its parent folder(s)}
-                            {--force : Overwrite existing files without confirmation}
-                            {--dry-run : Preview the file that would be created without actually creating it}';
+    protected $signature = 'kernel:class {name : The class path from the project root (e.g. App/Handlers/UserHandler)}
+                            {--kind=class : The kind of file to create (class, trait, interface or enum)}
+                            {--separator= : Extra character used to separate folders (e.g. ".")}
+                            {--force : Overwrite the file if it already exists}
+                            {--dry-run : Display the generated file without writing it}';
 
-    protected $description = 'Create a new class, trait, or interface file';
+    protected $description = 'Create a new class, trait, interface or enum anywhere in the project';
+
+    protected const KINDS = ['class', 'trait', 'interface', 'enum'];
 
     public function handle(): int
     {
-        $filename = $this->argument('filename');
+        $kind = strtolower((string) ($this->option('kind') ?: 'class'));
 
-        if (!$this->isValidFilename($filename)) {
-            $this->error('The filename is not correct. Only alphanumeric characters, dots, underscores, backslashes, and hyphens are allowed.');
+        if (! in_array($kind, self::KINDS, true)) {
+            $this->error('Invalid kind. The kind must be one of: '.implode(', ', self::KINDS).'.');
+
             return self::FAILURE;
         }
 
-        $kind = $this->getKind();
-        if ($kind === null) {
-            return self::FAILURE;
+        $name = (string) $this->argument('name');
+
+        if ($separator = $this->option('separator')) {
+            $name = str_replace($separator, '/', $name);
         }
 
         try {
-            $path = $this->buildFilePath($filename);
-            $question = "There is already a file with this name. Do you want to replace it? [y/n]";
+            [$namespace, $class] = $this->parseName($name);
+        } catch (InvalidArgumentException $e) {
+            $this->error($e->getMessage());
 
-            if (!$this->shouldReplaceFile($path, $question)) {
-                return self::SUCCESS;
-            }
-
-            $pathParts = $this->splitPath($filename);
-            $basePath = base_path();
-            $this->createFoldersIfNecessary($pathParts, $basePath);
-
-            $stub = $this->getStubContent($kind);
-            $className = $pathParts[count($pathParts) - 1];
-            $namespace = $this->buildNamespace($pathParts);
-
-            $stub = $this->replaceKindName($kind, $className, $stub);
-            $stub = $this->replaceClassNamespace($namespace, $stub);
-
-            $this->writeFile($path, $stub);
-            $this->displaySuccess(ucfirst($kind) . ' created successfully!', $path);
-            return self::SUCCESS;
-        } catch (\Exception $e) {
-            $this->error("Error: {$e->getMessage()}");
             return self::FAILURE;
         }
+
+        $path = $this->pathFor($namespace, $class);
+
+        $content = $this->render($this->getStubContent($kind), [
+            "DummyNamespace\n\n" => $namespace === '' ? '' : "namespace {$namespace};\n\n",
+            'DummyClass' => $class,
+            'DummyTrait' => $class,
+            'DummyInterface' => $class,
+            'DummyEnum' => $class,
+        ]);
+
+        $this->generate($path, $content, Str::ucfirst($kind));
+
+        return self::SUCCESS;
     }
 
-    protected function buildFilePath(string $filename): string
+    /**
+     * Map the root namespace to app/ (App\Foo => app/Foo.php), other namespaces to their folders.
+     */
+    protected function pathFor(string $namespace, string $class): string
     {
-        return base_path($filename . '.php');
-    }
+        $root = $this->rootNamespace();
 
-    protected function splitPath(string $filename): array
-    {
-        return str_contains($filename, '/') ? explode('/', $filename) : explode('\\', $filename);
-    }
+        if ($namespace === $root || Str::startsWith($namespace, $root.'\\')) {
+            $relative = trim(Str::after($namespace, $root), '\\');
 
-    protected function buildNamespace(array $pathParts): string
-    {
-        $namespace = '';
-        for ($i = 0; $i < count($pathParts) - 1; $i++) {
-            $namespace .= ucfirst($pathParts[$i]) . '\\';
+            return $this->laravel->path(($relative === '' ? '' : str_replace('\\', '/', $relative).'/').$class.'.php');
         }
-        return Str::replaceLast('\\', '', $namespace);
-    }
 
-    protected function replaceKindName(string $kind, string $name, string $stub): string
-    {
-        return str_replace('Dummy' . ucfirst($kind), ucfirst($name), $stub);
-    }
+        $relative = $namespace === '' ? '' : str_replace('\\', '/', $namespace).'/';
 
-    protected function replaceClassNamespace(string $namespace, string $stub): string
-    {
-        if (!empty($namespace)) {
-            return str_replace('DummyNamespace', 'namespace ' . $namespace . ';', $stub);
-        }
-        return str_replace('DummyNamespace', '', $stub);
-    }
-
-    protected function getKind(): ?string
-    {
-        $kind = $this->option('kind');
-        if ($kind === null) {
-            return 'class';
-        }
-        $validKinds = ['class', 'trait', 'interface'];
-        if (!in_array($kind, $validKinds, true)) {
-            $this->error('Invalid kind value. The kind must be one of: class, trait, interface');
-            return null;
-        }
-        return $kind;
+        return $this->laravel->basePath($relative.$class.'.php');
     }
 }

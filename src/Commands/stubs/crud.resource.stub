@@ -2,7 +2,8 @@
 
 namespace App\Resources;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Builders\Form;
+use App\Builders\Table;
 
 /**
  * DummyResourceName Resource Class
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class DummyResourceClass extends Resource
 {
-    protected $model = App\Models\DummyModel::class;
+    protected $model = \App\Models\DummyModel::class;
     protected $name = 'DummyResourcePlural';
     protected $routePrefix = 'DummyResourceKebab';
     protected $view = null;

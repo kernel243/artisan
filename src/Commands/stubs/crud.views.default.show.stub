@@ -8,11 +8,11 @@
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold text-gray-800">View {{ $resourceName }}</h1>
             <div class="space-x-2">
-                <a href="{{ route('{{ $routePrefix }}.edit', $item->id) }}" 
+                <a href="{{ route($routePrefix.'.edit', $item->id) }}" 
                    class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
                     Edit
                 </a>
-                <a href="{{ route('{{ $routePrefix }}.index') }}" 
+                <a href="{{ route($routePrefix.'.index') }}" 
                    class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Back to List
                 </a>
@@ -40,7 +40,7 @@
         </div>
 
         <div class="mt-4">
-            <form action="{{ route('{{ $routePrefix }}.destroy', $item->id) }}" method="POST" class="inline">
+            <form action="{{ route($routePrefix.'.destroy', $item->id) }}" method="POST" class="inline">
                 @csrf
                 @method('DELETE')
                 <button type="submit" 

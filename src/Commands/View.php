@@ -4,100 +4,51 @@ namespace Kernel243\Artisan\Commands;
 
 class View extends BaseCommand
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'make:view {name} {--layout= : The layout that the view will extend} {--module= : The module on which the repository class will be based on}';
+    protected $signature = 'kernel:view {name : The view name in dot notation (e.g. admin.users.index)}
+                            {--layout= : The layout the view extends (e.g. layouts.app)}
+                            {--module= : The nwidart module where the view will be created}
+                            {--force : Overwrite the file if it already exists}
+                            {--dry-run : Display the generated file without writing it}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Create a new view';
+    protected $description = 'Create a new Blade view, optionally extending a layout';
 
-    /**
-     * Create a new command instance.
-     *
-     * @return void
-     */
-    public function __construct()
+    public function handle(): int
     {
-        parent::__construct();
+        $name = (string) $this->argument('name');
+
+        if (! preg_match('/^[A-Za-z0-9_\-]+(\.[A-Za-z0-9_\-]+)*$/', $name)) {
+            $this->error('Invalid view name. Use letters, digits, dashes and underscores separated by dots.');
+
+            return self::FAILURE;
+        }
+
+        $module = $this->option('module') ?: null;
+
+        if ($module && ! $this->moduleExists($module)) {
+            $this->error("The module \"{$this->moduleName($module)}\" does not exist.");
+
+            return self::FAILURE;
+        }
+
+        $path = $this->viewsDirectory($module).'/'.str_replace('.', '/', $name).'.blade.php';
+        $layout = $this->option('layout');
+        $content = $layout ? $this->render($this->getStubContent('view'), ['DummyLayout' => $layout]) : '';
+
+        $this->generate($path, $content, 'View');
+
+        return self::SUCCESS;
     }
 
-    /**
-     * Retrieve the stub content from the view's stub file.
-     *
-     * @return mixed
-     */
-    protected function getStub()
+    protected function viewsDirectory(?string $module): string
     {
-        return file_get_contents(__DIR__.'/stubs/view.stub');
-    }
+        if (! $module) {
+            return $this->laravel->resourcePath('views');
+        }
 
-    /**
-     * Fill the right layout name in the stub.
-     *
-     * @param $layout
-     * @param $stub
-     * @return mixed
-     */
-    protected function replaceLayout($layout, $stub)
-    {
-        return str_replace(
-            'Layout',
-            $layout,
-            $stub
-        );
-    }
+        $base = $this->moduleBasePath($module);
 
-    /**
-     * Execute the console command.
-     *
-     * @return mixed
-     */
-    public function handle()
-    {
-        $path = explode('.', $this->argument('name'));
-        $module = $this->option('module');
-        $content = '';
-        $folder = null;
-        if (preg_match('#^[a-zA-Z._\-0-9]+$#', $this->argument('name'))) {
-            if (is_null($module)) {
-                $folder = resource_path('/views');
-            } else {
-                $folder = base_path('Modules/'.$module.'/Resources/views');
-            }
-            for ($i = 0; $i < count($path) - 1; $i++) {
-                if (!is_dir($folder . '/' . $path[$i])) {
-                    mkdir($folder . '/' . $path[$i]);
-                }
-                $folder .= '/' . $path[$i];
-            }
-            $fileIndex = count($path) - 1;
-
-            if (!empty($this->option('layout')))
-                $content = $this->replaceLayout($this->option('layout'), $this->getStub());
-
-            $filename = $folder . '/' . $path[$fileIndex] . '.blade.php';
-            $replaceIfNecessary = true;
-            if (file_exists($filename)) {
-                do {
-                    $input = $this->ask("There is a view with this name do you want to replace it ? [y/n] ");
-                } while (strtolower($input) != 'y' && strtolower($input) != 'n');
-
-                if('n' == strtolower($input))
-                    $replaceIfNecessary = false;
-            }
-
-            if ($replaceIfNecessary) {
-                file_put_contents($filename, $content);
-                $this->info('View created successfully.');
-            }
-        } else
-            $this->info('Invalid view name. Only alphanumeric characters and dashes are supported.');
+        return is_dir($base.'/Resources/views') || $this->isLegacyModule($module)
+            ? $base.'/Resources/views'
+            : $base.'/resources/views';
     }
 }

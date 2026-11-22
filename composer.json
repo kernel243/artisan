@@ -1,6 +1,6 @@
 {
     "name": "kernel243/artisan",
-    "description": "This package provides a set of artisan commands for Laravel",
+    "description": "Commandes artisan de génération de code (repository, service, resource, controller, CRUD, vues, langues) pour Laravel",
     "type": "library",
     "license": "MIT",
     "keywords": [
@@ -14,6 +14,23 @@
         "resource",
         "stubs"
     ],
+    "authors": [
+        {
+            "name": "merdi elongo",
+            "email": "merdielongo9@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/console": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/filesystem": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/support": "^10.0|^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.13",
+        "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+        "pestphp/pest": "^2.0|^3.0|^4.0"
+    },
     "autoload": {
         "psr-4": {
             "Kernel243\\Artisan\\": "src/"
@@ -31,28 +48,21 @@
             ]
         }
     },
-    "authors": [
-        {
-            "name": "merdi elongo",
-            "email": "merdielongo9@gmail.com"
-        }
-    ],
-    "minimum-stability": "stable",
-    "prefer-stable": true,
-    "require": {
-        "php": "^8.0|^8.1|^8.2|^8.3",
-        "laravel/framework": "^8.0|^9.0|^10.0|^11.0"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^9.0|^10.0",
-        "orchestra/testbench": "^6.0|^7.0|^8.0"
-    },
     "scripts": {
-        "test": "phpunit",
-        "analyse": "phpstan analyse"
+        "test": "pest",
+        "lint": "pint",
+        "lint:check": "pint --test",
+        "ci:check": [
+            "@lint:check",
+            "@test"
+        ]
     },
     "config": {
         "sort-packages": true,
-        "optimize-autoloader": true
-    }
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
 }
