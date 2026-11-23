@@ -70,6 +70,7 @@ describe('kernel:inertia-crud', function () {
             ->toContain('posts: Paginated<PostRow>;')
             ->toContain('{{ post.is_published ? \'Oui\' : \'Non\' }}')
             ->not->toContain('password')
+            ->not->toContain('can.')
             ->not->toContain('Dummy');
 
         expect(file_get_contents($this->sandboxPath('resources/js/pages/posts/Form.vue')))
@@ -145,6 +146,35 @@ describe('kernel:inertia-crud', function () {
 
         expect(substr_count($routes, "Route::resource('posts', PostController::class)"))->toBe(1)
             ->and($routes)->toContain("Route::resource('posts', \\App\\Http\\Controllers\\Admin\\PostController::class)");
+    });
+
+    it('authorizes every action with --policy', function () {
+        $this->artisan('kernel:inertia-crud', inertiaCrud(['--policy' => true]))->assertSuccessful();
+
+        $this->assertValidPhp('app/Policies/PostPolicy.php');
+        $this->assertValidPhp('app/Support/PermissionRegistry.php');
+        $this->assertValidPhp('tests/Feature/PostControllerTest.php');
+
+        expect(file_get_contents($this->sandboxPath('app/Policies/PostPolicy.php')))
+            ->toContain('public function forceDelete(User $user, Post $post): bool');
+
+        expect(file_get_contents($this->sandboxPath('app/Http/Controllers/PostController.php')))
+            ->toContain('use Illuminate\Support\Facades\Gate;')
+            ->toContain("Gate::authorize('viewAny', Post::class);")
+            ->toContain("Gate::authorize('update', \$post);")
+            ->toContain("Gate::authorize('delete', \$post);")
+            ->toContain("'update' => \$request->user()->can('update', \$post),")
+            ->toContain("'can' => ['create' => \$request->user()->can('create', Post::class)],");
+
+        expect(file_get_contents($this->sandboxPath('resources/js/pages/posts/Index.vue')))
+            ->toContain('<Button v-if="can.create" as-child>')
+            ->toContain('v-if="post.can.update"')
+            ->toContain('can: { update: boolean; delete: boolean };');
+
+        expect(file_get_contents($this->sandboxPath('tests/Feature/PostControllerTest.php')))
+            ->toContain('use Spatie\Permission\Models\Permission;')
+            ->toContain("\$permissions = ['posts.view', 'posts.create', 'posts.update', 'posts.delete'];")
+            ->toContain("it('refuse la liste sans permission'");
     });
 
     it('omits the search without a text column', function () {

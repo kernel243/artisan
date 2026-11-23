@@ -28,6 +28,7 @@ class CommandServiceProvider extends ServiceProvider
         Commands\RequestMakeCommand::class,
         Commands\EnumMakeCommand::class,
         Commands\InertiaCrudMakeCommand::class,
+        Commands\PolicyMakeCommand::class,
     ];
 
     public function register(): void

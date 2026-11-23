@@ -1,0 +1,22 @@
+<?php
+
+namespace DummyNamespace;
+
+/**
+ * Source unique des permissions (module.action).
+ *
+ * Le seeder RolesAndPermissionsSeeder et les tests lisent cette liste :
+ * ajouter une permission ici suffit à la créer partout.
+ */
+final class PermissionRegistry
+{
+    /**
+     * @return array<string, string> permission => libellé
+     */
+    public static function all(): array
+    {
+        return [
+DummyPermissions
+        ];
+    }
+}

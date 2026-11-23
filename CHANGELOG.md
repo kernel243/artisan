@@ -4,7 +4,8 @@
 
 ### Added
 - `kernel:action`, `kernel:data`, `kernel:request` and `kernel:enum` generators.
-- `kernel:inertia-crud`: Inertia + Vue TypeScript CRUD (migration, model, factory, DTO, requests, actions, controller, routes, Wayfinder pages, Pest tests), formatted with the project's Pint and Prettier.
+- `kernel:inertia-crud`: Inertia + Vue TypeScript CRUD (migration, model, factory, DTO, requests, actions, controller, routes, Wayfinder pages, Pest tests), formatted with the project's Pint and Prettier; `--policy` authorizes every action.
+- `kernel:policy`: permission per ability, optional tenant check (404 for another tenant), permissions added to `App\Support\PermissionRegistry` (created with its seeder when missing).
 - Publishable configuration `config/kernel-artisan.php` (`vendor:publish --tag=kernel-config`).
 - Richer `--fields` syntax (`nullable`, `unique`, `?`) and field inference from an existing model.
 - Support for Laravel 10, 11, 12 and 13 (PHP 8.2+), tested on Laravel 10.50, 11.57, 12.73 and 13.43.

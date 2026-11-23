@@ -45,6 +45,7 @@ All commands are prefixed with `kernel:`. The former `make:*` names are kept as 
 | `kernel:request`       | –                    | `Store<Model>Request` and `Update<Model>Request`       |
 | `kernel:enum`          | –                    | A string-backed enum with `label()` and `HasOptions`   |
 | `kernel:inertia-crud`  | –                    | An Inertia + Vue TypeScript CRUD, tests included       |
+| `kernel:policy`        | –                    | A policy backed by permissions, optionally per tenant  |
 
 Every generator accepts:
 
@@ -186,9 +187,28 @@ Generates, for a Laravel + Inertia + Vue TypeScript application (official starte
 - `resources/js/pages/posts/Index.vue` (debounced search, pagination, delete confirmation) and `Form.vue` (create and edit with `useForm`), using Wayfinder (`@/routes/posts`) and shadcn-vue components;
 - `tests/Feature/PostControllerTest.php`, Pest tests in French (list, form, create, validation, update, delete), when the project uses Pest.
 
+With `--policy`, the CRUD also gets its policy and permissions (`kernel:policy`): every controller action calls `Gate::authorize()`, the list receives `can` props to hide the buttons the user cannot use, and the tests give the permissions to the user and check that a user without them is refused. Requires spatie/laravel-permission (`HasRoles` on the user).
+
 The written files are formatted with the project's Pint and Prettier when they are installed (`--no-format` to skip). Then run `php artisan migrate` and `php artisan wayfinder:generate`.
 
 Labels (`Title`, `Author`…) come from the field names: translate them. JSON fields are stored but left out of the form.
+
+### Policy
+
+```bash
+php artisan kernel:policy Post                            # posts.view, posts.create, posts.update, posts.delete
+php artisan kernel:policy Post --tenant=organization_id   # and the record must belong to the user's organization
+```
+
+Every ability checks a permission (`viewAny` / `view` → `posts.view`, …; `restore` and `forceDelete` when the model uses `SoftDeletes`). With `--tenant`, a record of another tenant is denied as not found (404, its existence is not revealed), and a user without tenant gets nothing (fail closed).
+
+The permissions are added to `App\Support\PermissionRegistry`, the single source read by the seeder:
+
+- a registry listing its modules in `const MODULES = [...]` gets the module (`'posts'`);
+- a registry returning `'permission' => 'label'` from `all()` gets the four permissions with French labels;
+- without registry, the command creates it, with an idempotent `RolesAndPermissionsSeeder` (`firstOrCreate`) when there is none.
+
+The separator follows the existing registry (`posts:update` or `posts.update`), or `permissions.separator`. `--no-registry` leaves the registry alone.
 
 ## Fields
 
@@ -214,11 +234,13 @@ php artisan vendor:publish --tag=kernel-config
 | `actions.transaction` | `true` | Wrap create / update actions in `DB::transaction()` |
 | `data.enabled` | `true` | Use DTOs in actions when spatie/laravel-data is installed |
 | `requests.authorize_in_controller` | `true` | `authorize()` returns `true`; `false` generates `$this->user()?->can('posts.create')` |
+| `permissions.separator` | `null` | `'.'` or `':'` between module and ability; `null` follows the registry |
 | `inertia.zone` | `null` | Default `--zone` of `kernel:inertia-crud` |
 | `inertia.pages_case` | `null` | `'kebab'` (`pages/admin/posts`), `'studly'` (`Pages/Admin/Posts`), `null` to detect it |
 | `inertia.layout` | `'options'` | `'options'`: breadcrumbs through `defineOptions()`; `'component'`: page wrapped in `<AppLayout>` |
 | `inertia.flash` | `'success'` | Flash key; `'toast'` gives `->with('toast', ['type' => 'success', 'message' => …])` |
 | `inertia.per_page` | `20` | Page size of the list |
+| `inertia.policy` | `false` | Default `--policy` of `kernel:inertia-crud` |
 
 ## Modules
 

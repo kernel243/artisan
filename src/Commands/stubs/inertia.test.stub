@@ -1,12 +1,9 @@
 <?php
 
-use DummyModelClass;
-use App\Models\User;
-use Illuminate\Support\Arr;
-use Inertia\Testing\AssertableInertia as Assert;
+DummyImports
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
+DummyActingAs
 });
 
 /**
@@ -32,7 +29,7 @@ it('affiche la liste des DummyLowerLabel', function () {
             ->has('DummyPluralVariable.data', 3));
 });
 
-it('affiche le formulaire de création', function () {
+DummyForbiddenTestit('affiche le formulaire de création', function () {
     $this->get(route('DummyRoutePrefix.create'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('DummyFormComponent'));

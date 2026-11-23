@@ -30,6 +30,12 @@ return [
         'authorize_in_controller' => true,
     ],
 
+    'permissions' => [
+        // Between module and ability: 'blog-posts.update'. null: ':' when App\Support\PermissionRegistry
+        // already uses "module:ability", '.' otherwise.
+        'separator' => null,
+    ],
+
     'inertia' => [
         // Default area of kernel:inertia-crud (e.g. 'admin'): Http/Controllers/Admin, pages admin/..., routes admin.*.
         'zone' => null,
@@ -45,6 +51,9 @@ return [
         'flash' => 'success',
 
         'per_page' => 20,
+
+        // Generate the policy and authorize every action by default (--policy). Needs spatie/laravel-permission.
+        'policy' => false,
     ],
 
 ];

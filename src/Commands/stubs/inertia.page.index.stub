@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import DummyRoutes from 'DummyRoutesImport';
 
 type DummyModelRow = {
-DummyRowType
+DummyRowTypeDummyRowCanType
 };
 
 type Paginated<T> = {
@@ -28,7 +28,7 @@ defineOptions({
 
 const props = defineProps<{
     DummyPluralVariable: Paginated<DummyModelRow>;
-    filters: { search?: string };
+    filters: { search?: string };DummyCanType
 }>();
 
 const search = ref(props.filters.search ?? '');
@@ -61,7 +61,7 @@ function destroy(DummyVariable: DummyModelRow): void {
         <div class="flex flex-wrap items-center justify-between gap-4">
             <h1 class="text-xl font-semibold">DummyLabel</h1>
 
-            <Button as-child>
+DummyCreateButton
                 <Link :href="DummyRoutes.create()">
                     <Plus class="size-4" /> Ajouter
                 </Link>
@@ -87,7 +87,7 @@ DummyHeaders
 DummyCells
                         <td class="px-4 py-3">
                             <div class="flex justify-end gap-1">
-                                <Button variant="ghost" size="icon" as-child>
+DummyEditButton
                                     <Link
                                         :href="DummyRoutes.edit(DummyVariable.id)"
                                         aria-label="Modifier"
@@ -95,12 +95,7 @@ DummyCells
                                         <Pencil class="size-4" />
                                     </Link>
                                 </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label="Supprimer"
-                                    @click="destroy(DummyVariable)"
-                                >
+DummyDeleteButton
                                     <Trash2 class="size-4" />
                                 </Button>
                             </div>

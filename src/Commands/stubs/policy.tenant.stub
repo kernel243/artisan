@@ -1,0 +1,12 @@
+    /**
+     * Un enregistrement d'un autre DummyTenant répond 404 : on ne révèle pas qu'il existe.
+     * Un utilisateur sans DummyTenant n'accède à rien (échec fermé).
+     */
+    private function decide(DummyUser $user, DummyModel $DummyVariable, string $permission): Response
+    {
+        if ($user->DummyTenant === null || $DummyVariable->DummyTenant !== $user->DummyTenant) {
+            return Response::denyAsNotFound();
+        }
+
+        return $user->can($permission) ? Response::allow() : Response::deny();
+    }

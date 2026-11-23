@@ -1,0 +1,6 @@
+it('refuse la liste sans permission', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('DummyRoutePrefix.index'))
+        ->assertForbidden();
+});
+
