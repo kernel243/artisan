@@ -69,10 +69,6 @@ class DataMakeCommand extends BaseCommand
         foreach ($fields as $field) {
             $type = $this->phpType($field);
 
-            if ($type === 'CarbonInterface') {
-                $imports[] = 'Carbon\\CarbonInterface';
-            }
-
             $types = [$type];
 
             if ($partial) {
@@ -83,7 +79,12 @@ class DataMakeCommand extends BaseCommand
                 $types[] = 'null';
             }
 
-            $declaration = count($types) === 1 ? $type : implode('|', $types);
+            // Pint (nullable_type_declaration) prefers ?string to string|null.
+            $declaration = match (true) {
+                count($types) === 1 => $type,
+                count($types) === 2 && $field['nullable'] => '?'.$type,
+                default => implode('|', $types),
+            };
 
             $properties[] = "        public {$declaration} \${$field['name']},";
         }

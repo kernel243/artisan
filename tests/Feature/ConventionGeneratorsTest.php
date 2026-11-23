@@ -74,7 +74,7 @@ describe('kernel:data', function () {
         expect(file_get_contents($this->sandboxPath('app/Data/Posts/PostData.php')))
             ->toContain('public string $title,')
             ->toContain('public float $price,')
-            ->toContain('public CarbonInterface|null $published_at,')
+            ->toContain('public ?string $published_at,')
             ->toContain('public int $author_id,');
     });
 
