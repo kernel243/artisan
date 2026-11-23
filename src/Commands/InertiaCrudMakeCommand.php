@@ -228,8 +228,45 @@ class InertiaCrudMakeCommand extends BaseCommand
         $hidden = array_map(fn (array $field) => "        '{$field['name']}',", array_filter($this->fields, fn (array $field) => $field['type'] === 'password'));
 
         $casts = [];
+        $imports = [
+            'Database\\Factories\\'.$model.'Factory',
+            'Illuminate\\Database\\Eloquent\\Factories\\HasFactory',
+            'Illuminate\\Database\\Eloquent\\Model',
+            'Illuminate\\Database\\Eloquent\\SoftDeletes',
+        ];
+        $relations = [];
+
+        foreach ($this->selects() as $select) {
+            $this->importUnlessSibling($imports, $select['class'], $this->rootNamespace().'\\Models');
+
+            if ($select['kind'] === 'relation') {
+                $imports[] = 'Illuminate\\Database\\Eloquent\\Relations\\BelongsTo';
+                $related = class_basename($select['class']);
+                $relations[] = implode("\n", [
+                    '',
+                    '    /**',
+                    "     * @return BelongsTo<{$related}, \$this>",
+                    '     */',
+                    "    public function {$select['relation']}(): BelongsTo",
+                    '    {',
+                    "        return \$this->belongsTo({$related}::class);",
+                    '    }',
+                ]);
+            }
+        }
+
+        $imports = array_values(array_unique($imports));
+        sort($imports);
 
         foreach ($this->fields as $field) {
+            $enum = ($this->selects()[$field['name']]['kind'] ?? null) === 'enum' ? $this->selects()[$field['name']]['class'] : null;
+
+            if ($enum !== null) {
+                $casts[] = "            '{$field['name']}' => ".class_basename($enum).'::class,';
+
+                continue;
+            }
+
             $cast = match ($field['type']) {
                 'integer', 'int', 'bigint' => 'integer',
                 'decimal' => 'decimal:2',
@@ -249,6 +286,8 @@ class InertiaCrudMakeCommand extends BaseCommand
 
         $content = $this->render($this->getStubContent('inertia.model'), [
             'DummyNamespace' => $this->rootNamespace().'\\Models',
+            'DummyImports' => implode("\n", array_map(fn (string $import) => "use {$import};", $imports)),
+            'DummyRelations' => $relations === [] ? '' : implode("\n", $relations)."\n",
             'DummyFactory' => $model.'Factory',
             'DummyModel' => $model,
             'DummyFillable' => $fillable === [] ? "        // 'name'," : implode("\n", $fillable),
@@ -275,6 +314,12 @@ class InertiaCrudMakeCommand extends BaseCommand
             }
         }
 
+        foreach ($this->selects() as $select) {
+            if ($select['kind'] === 'enum') {
+                $imports[] = $select['class'];
+            }
+        }
+
         $imports = array_values(array_unique($imports));
         sort($imports);
 
@@ -295,6 +340,11 @@ class InertiaCrudMakeCommand extends BaseCommand
         }
 
         $faker = $field['unique'] ? 'fake()->unique()' : 'fake()';
+        $select = $this->selects()[$field['name']] ?? null;
+
+        if ($select !== null && $select['kind'] === 'enum') {
+            return "{$faker}->randomElement(".class_basename($select['class']).'::cases())';
+        }
 
         return match ($field['type']) {
             'text', 'textarea', 'longtext' => "{$faker}->paragraph()",
@@ -322,6 +372,145 @@ class InertiaCrudMakeCommand extends BaseCommand
     protected function relatedModel(array $field): string
     {
         return $this->rootNamespace().'\\Models\\'.Str::studly(Str::beforeLast($field['name'], '_id'));
+    }
+
+    /**
+     * Fields edited through a select: foreign keys (options read from the related model)
+     * and enum fields whose enum exists in app/Enums.
+     *
+     * @return array<string, array{kind: string, class: string, prop: string, relation?: string, label?: string}>
+     */
+    protected function selects(): array
+    {
+        $selects = [];
+
+        foreach ($this->fields as $field) {
+            if ($field['type'] === 'foreignid') {
+                $class = $this->relatedModel($field);
+                $selects[$field['name']] = [
+                    'kind' => 'relation',
+                    'class' => $class,
+                    'relation' => $this->relationName($field),
+                    'label' => $this->relatedLabelColumn($class),
+                    'prop' => $this->relationName($field).'Options',
+                ];
+            } elseif (($enum = $this->enumClass($field, $this->names['model'])) !== null) {
+                $selects[$field['name']] = ['kind' => 'enum', 'class' => $enum, 'prop' => Str::camel($field['name']).'Options'];
+            }
+        }
+
+        return $selects;
+    }
+
+    /**
+     * @param  list<string>  $imports
+     */
+    protected function importUnlessSibling(array &$imports, string $class, string $namespace): void
+    {
+        if (Str::beforeLast($class, '\\') !== $namespace) {
+            $imports[] = $class;
+        }
+    }
+
+    /**
+     * Private formOptions() of the controller: the lists of the selects.
+     */
+    protected function formOptionsMethod(): string
+    {
+        $lines = [];
+
+        foreach ($this->selects() as $select) {
+            $short = class_basename($select['class']);
+
+            if ($select['kind'] === 'enum') {
+                $label = $this->enumHas($select['class'], 'label') ? '$case->label()' : '$case->name';
+                $lines[] = $this->enumHas($select['class'], 'options')
+                    ? "            '{$select['prop']}' => {$short}::options(),"
+                    : "            '{$select['prop']}' => array_map(fn ({$short} \$case): array => ['value' => \$case->value, 'label' => {$label}], {$short}::cases()),";
+
+                continue;
+            }
+
+            $variable = '$'.Str::camel($short);
+            $column = $select['label'];
+            $columns = $column === 'id' ? "['id']" : "['id', '{$column}']";
+            $label = $column === 'id' ? "(string) {$variable}->id" : "{$variable}->{$column}";
+
+            $lines[] = implode("\n", [
+                "            '{$select['prop']}' => {$short}::query()",
+                "                ->orderBy('{$column}')",
+                "                ->get({$columns})",
+                "                ->map(fn ({$short} {$variable}): array => ['value' => {$variable}->id, 'label' => {$label}]),",
+            ]);
+        }
+
+        return implode("\n", [
+            '',
+            '    /**',
+            '     * Listes des selects du formulaire.',
+            '     *',
+            '     * @return array<string, mixed>',
+            '     */',
+            '    private function formOptions(): array',
+            '    {',
+            '        return [',
+            ...$lines,
+            '        ];',
+            '    }',
+            '',
+        ]);
+    }
+
+    /**
+     * Columns of the list: a foreign key shows the label of its related record, an enum its label.
+     *
+     * @return list<array{key: string, field: Field, value: string, ts: string}>
+     */
+    protected function listColumns(): array
+    {
+        $variable = '$'.$this->names['variable'];
+        $columns = [];
+
+        foreach ($this->listFields() as $field) {
+            $name = $field['name'];
+            $select = $this->selects()[$name] ?? null;
+            $null = $field['nullable'] ? ' | null' : '';
+
+            if ($select !== null && $select['kind'] === 'relation' && $select['label'] !== 'id') {
+                $columns[] = ['key' => $select['relation'], 'field' => $field, 'value' => "{$variable}->{$select['relation']}?->{$select['label']}", 'ts' => 'string | null'];
+
+                continue;
+            }
+
+            if ($select !== null && $select['kind'] === 'enum') {
+                $member = $this->enumHas($select['class'], 'label') ? 'label()' : 'value';
+                $columns[] = ['key' => $name, 'field' => $field, 'value' => "{$variable}->{$name}?->{$member}", 'ts' => 'string'.$null];
+
+                continue;
+            }
+
+            $columns[] = ['key' => $name, 'field' => $field, 'value' => $this->propValue($field), 'ts' => $this->tsScalar($field).$null];
+        }
+
+        return $columns;
+    }
+
+    /**
+     * Eager loading of the relations shown in the list.
+     */
+    protected function withClause(): string
+    {
+        $with = [];
+
+        foreach ($this->listColumns() as $column) {
+            $select = $this->selects()[$column['field']['name']] ?? null;
+
+            if ($select !== null && $select['kind'] === 'relation' && $column['key'] === $select['relation']) {
+                $with[] = "'{$select['relation']}:id,{$select['label']}'";
+            }
+        }
+
+        return $with === [] ? '' : "\n                ->with([".implode(', ', $with).'])';
     }
 
     /**
@@ -386,6 +575,10 @@ class InertiaCrudMakeCommand extends BaseCommand
             $imports[] = 'Illuminate\\Support\\Facades\\Gate';
         }
 
+        foreach ($this->selects() as $select) {
+            $imports[] = $select['class'];
+        }
+
         // The application base controller when it exists (imported from a zone namespace).
         if (! is_file($this->laravel->path('Http/Controllers/Controller.php'))) {
             $imports[] = 'Illuminate\\Routing\\Controller';
@@ -405,9 +598,15 @@ class InertiaCrudMakeCommand extends BaseCommand
             'DummyModel' => $model,
             'DummyVariable' => $variable,
             'DummyPluralVariable' => $this->names['plural'],
-            'DummySearch' => $this->searchClause(),
+            'DummySearch' => $this->withClause().$this->searchClause(),
             'DummyPerPage' => (string) (int) $this->laravel['config']->get('kernel-artisan.inertia.per_page', 20),
-            'DummyRowProps' => $this->propsArray($this->listFields(), 20),
+            'DummyRowProps' => implode("\n", [
+                "                    'id' => \${$variable}->id,",
+                ...array_map(fn (array $column) => "                    '{$column['key']}' => {$column['value']},", $this->listColumns()),
+            ]),
+            'DummyCreateOptions' => $this->selects() === [] ? '' : ', $this->formOptions()',
+            'DummyEditOptions' => $this->selects() === [] ? '' : "\n            ...\$this->formOptions(),",
+            'DummyFormOptionsMethod' => $this->selects() === [] ? '' : $this->formOptionsMethod(),
             'DummyEditProps' => $this->propsArray($this->formFields(false), 16),
             'DummyIndexComponent' => $this->component('Index'),
             'DummyFormComponent' => $this->component('Form'),
@@ -533,17 +732,29 @@ class InertiaCrudMakeCommand extends BaseCommand
         $lines = ["{$pad}'id' => \${$variable}->id,"];
 
         foreach ($fields as $field) {
-            $value = match ($field['type']) {
-                'date' => "\${$variable}->{$field['name']}?->toDateString()",
-                // Format of <input type="datetime-local">.
-                'datetime', 'timestamp' => "\${$variable}->{$field['name']}?->format('Y-m-d\\TH:i')",
-                default => "\${$variable}->{$field['name']}",
-            };
+            $value = ($this->selects()[$field['name']]['kind'] ?? null) === 'enum'
+                ? "\${$variable}->{$field['name']}?->value"
+                : $this->propValue($field);
 
             $lines[] = "{$pad}'{$field['name']}' => {$value},";
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * @param  Field  $field
+     */
+    protected function propValue(array $field): string
+    {
+        $variable = $this->names['variable'];
+
+        return match ($field['type']) {
+            'date' => "\${$variable}->{$field['name']}?->toDateString()",
+            // Format of <input type="datetime-local">.
+            'datetime', 'timestamp' => "\${$variable}->{$field['name']}?->format('Y-m-d\\TH:i')",
+            default => "\${$variable}->{$field['name']}",
+        };
     }
 
     /**
@@ -679,7 +890,10 @@ class InertiaCrudMakeCommand extends BaseCommand
         ];
 
         $index = $this->render($this->getStubContent('inertia.page.index'), $replacements + [
-            'DummyRowType' => $this->tsType($this->listFields()),
+            'DummyRowType' => implode("\n", [
+                '    id: number;',
+                ...array_map(fn (array $column) => "    {$column['key']}: {$column['ts']};", $this->listColumns()),
+            ]),
             'DummyHeaders' => $this->indexHeaders(),
             'DummyCells' => $this->indexCells(),
             'DummyColspan' => (string) (count($this->listFields()) + 1),
@@ -691,6 +905,8 @@ class InertiaCrudMakeCommand extends BaseCommand
             'DummyModelType' => $this->tsType($this->formFields(false)),
             'DummyFormDefaults' => $this->formDefaults(),
             'DummyInputs' => $this->formInputs(),
+            'DummyOptionType' => $this->selects() === [] ? '' : "\n\ntype Option = { value: number | string; label: string };",
+            'DummyOptionProps' => implode('', array_map(fn (array $select) => "\n    {$select['prop']}: Option[];", $this->selects())),
         ]);
 
         if ($this->searchField() === null) {
@@ -758,24 +974,30 @@ class InertiaCrudMakeCommand extends BaseCommand
         $lines = ['    id: number;'];
 
         foreach ($fields as $field) {
-            $type = match ($field['type']) {
-                'integer', 'int', 'bigint', 'foreignid', 'float', 'double' => 'number',
-                'boolean', 'bool', 'tinyint' => 'boolean',
-                // The decimal:2 cast serializes to a string.
-                default => 'string',
-            };
-
-            $lines[] = "    {$field['name']}: {$type}".($field['nullable'] ? ' | null' : '').';';
+            $lines[] = "    {$field['name']}: {$this->tsScalar($field)}".($field['nullable'] ? ' | null' : '').';';
         }
 
         return implode("\n", $lines);
     }
 
+    /**
+     * @param  Field  $field
+     */
+    protected function tsScalar(array $field): string
+    {
+        return match ($field['type']) {
+            'integer', 'int', 'bigint', 'foreignid', 'float', 'double' => 'number',
+            'boolean', 'bool', 'tinyint' => 'boolean',
+            // The decimal:2 cast serializes to a string.
+            default => 'string',
+        };
+    }
+
     protected function indexHeaders(): string
     {
         $headers = array_map(
-            fn (array $field) => "                        <th class=\"px-4 py-3 font-medium\">{$this->fieldLabel($field['name'])}</th>",
-            $this->listFields(),
+            fn (array $column) => "                        <th class=\"px-4 py-3 font-medium\">{$this->fieldLabel($column['field']['name'])}</th>",
+            $this->listColumns(),
         );
 
         return implode("\n", $headers);
@@ -785,10 +1007,10 @@ class InertiaCrudMakeCommand extends BaseCommand
     {
         $variable = $this->names['variable'];
 
-        return implode("\n", array_map(function (array $field) use ($variable) {
-            $value = in_array($field['type'], ['boolean', 'bool', 'tinyint'], true)
-                ? "{{ {$variable}.{$field['name']} ? 'Oui' : 'Non' }}"
-                : "{{ {$variable}.{$field['name']} ?? '—' }}";
+        return implode("\n", array_map(function (array $column) use ($variable) {
+            $value = in_array($column['field']['type'], ['boolean', 'bool', 'tinyint'], true)
+                ? "{{ {$variable}.{$column['key']} ? 'Oui' : 'Non' }}"
+                : "{{ {$variable}.{$column['key']} ?? '—' }}";
 
             $line = "                        <td class=\"px-4 py-3\">{$value}</td>";
 
@@ -798,7 +1020,7 @@ class InertiaCrudMakeCommand extends BaseCommand
                 "                            {$value}",
                 '                        </td>',
             ]);
-        }, $this->listFields()));
+        }, $this->listColumns()));
     }
 
     protected function formDefaults(): string
@@ -843,7 +1065,28 @@ class InertiaCrudMakeCommand extends BaseCommand
                 ]);
             }
 
-            if (in_array($field['type'], ['text', 'textarea', 'longtext'], true)) {
+            $select = $this->selects()[$name] ?? null;
+
+            if ($select !== null) {
+                $control = implode("\n", [
+                    '                <select',
+                    "                    id=\"{$name}\"",
+                    "                    v-model=\"form.{$name}\"",
+                    '                    class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"',
+                    '                >',
+                    $field['nullable']
+                        ? '                    <option value="">Aucun</option>'
+                        : '                    <option value="" disabled>Choisir…</option>',
+                    '                    <option',
+                    "                        v-for=\"option in {$select['prop']}\"",
+                    '                        :key="option.value"',
+                    '                        :value="option.value"',
+                    '                    >',
+                    '                        {{ option.label }}',
+                    '                    </option>',
+                    '                </select>',
+                ]);
+            } elseif (in_array($field['type'], ['text', 'textarea', 'longtext'], true)) {
                 $control = implode("\n", [
                     '                <textarea',
                     "                    id=\"{$name}\"",

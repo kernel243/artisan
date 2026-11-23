@@ -177,6 +177,57 @@ describe('kernel:inertia-crud', function () {
             ->toContain("it('refuse la liste sans permission'");
     });
 
+    it('edits foreign keys and enums through selects', function () {
+        $this->writeFixture('app/Enums/PostStatus.php', "<?php\n\nnamespace App\\Enums;\n\nuse App\\Enums\\Concerns\\HasOptions;\n\nenum PostStatus: string\n{\n    use HasOptions;\n\n    case Draft = 'draft';\n\n    public function label(): string\n    {\n        return 'Brouillon';\n    }\n}\n");
+        $this->writeFixture('app/Models/Writer.php', "<?php\n\nnamespace App\\Models;\n\nuse Illuminate\\Database\\Eloquent\\Model;\n\nclass Writer extends Model\n{\n    protected \$fillable = ['email', 'full_name'];\n}\n");
+        require_once $this->sandboxPath('app/Models/Writer.php');
+
+        $this->artisan('kernel:inertia-crud', ['name' => 'Post', '--fields' => 'title:string,status:enum,writer_id:foreignId,editor_id:foreignId?'])->assertSuccessful();
+
+        foreach (['app/Models/Post.php', 'app/Http/Controllers/PostController.php', 'app/Http/Requests/Posts/StorePostRequest.php', 'app/Data/Posts/PostData.php', 'database/factories/PostFactory.php'] as $file) {
+            $this->assertValidPhp($file);
+        }
+
+        expect(file_get_contents($this->sandboxPath('app/Models/Post.php')))
+            ->toContain('use App\Enums\PostStatus;')
+            ->not->toContain('use App\Models\Writer;')
+            ->toContain("'status' => PostStatus::class,")
+            ->toContain("     * @return BelongsTo<Writer, \$this>\n     */\n    public function writer(): BelongsTo")
+            ->toContain('return $this->belongsTo(Editor::class);');
+
+        expect(file_get_contents($this->sandboxPath('app/Http/Requests/Posts/StorePostRequest.php')))
+            ->toContain('use App\Enums\PostStatus;')
+            ->toContain("'status' => ['required', Rule::enum(PostStatus::class)],");
+
+        expect(file_get_contents($this->sandboxPath('app/Data/Posts/PostData.php')))
+            ->toContain('public PostStatus $status,');
+
+        expect(file_get_contents($this->sandboxPath('database/factories/PostFactory.php')))
+            ->toContain("'status' => fake()->randomElement(PostStatus::cases()),");
+
+        expect(file_get_contents($this->sandboxPath('app/Http/Controllers/PostController.php')))
+            ->toContain("->with(['writer:id,full_name'])")
+            ->toContain("'status' => \$post->status?->label(),")
+            ->toContain("'writer' => \$post->writer?->full_name,")
+            ->toContain("'editor_id' => \$post->editor_id,")
+            ->toContain("return Inertia::render('posts/Form', \$this->formOptions());")
+            ->toContain('...$this->formOptions(),')
+            ->toContain("'statusOptions' => PostStatus::options(),")
+            ->toContain("->map(fn (Writer \$writer): array => ['value' => \$writer->id, 'label' => \$writer->full_name]),")
+            ->toContain("->map(fn (Editor \$editor): array => ['value' => \$editor->id, 'label' => (string) \$editor->id]),");
+
+        expect(file_get_contents($this->sandboxPath('resources/js/pages/posts/Form.vue')))
+            ->toContain('type Option = { value: number | string; label: string };')
+            ->toContain('writerOptions: Option[];')
+            ->toContain('v-for="option in statusOptions"')
+            ->toContain('<option value="" disabled>Choisir…</option>')
+            ->toContain('<option value="">Aucun</option>');
+
+        expect(file_get_contents($this->sandboxPath('resources/js/pages/posts/Index.vue')))
+            ->toContain('writer: string | null;')
+            ->toContain("{{ post.writer ?? '—' }}");
+    });
+
     it('omits the search without a text column', function () {
         $this->artisan('kernel:inertia-crud', ['name' => 'Counter', '--fields' => 'value:integer'])->assertSuccessful();
 

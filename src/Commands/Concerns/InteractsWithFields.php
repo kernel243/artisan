@@ -150,7 +150,7 @@ trait InteractsWithFields
      *
      * @param  Field  $field
      */
-    protected function validationRules(array $field, string $table, ?string $ignoreRouteParameter = null): string
+    protected function validationRules(array $field, string $table, ?string $ignoreRouteParameter = null, ?string $enumClass = null): string
     {
         $presence = $field['nullable'] ? "'nullable'" : (in_array($field['type'], ['boolean', 'bool', 'tinyint'], true) ? "'sometimes'" : "'required'");
 
@@ -168,7 +168,7 @@ trait InteractsWithFields
             'date' => ["'date'"],
             'datetime', 'timestamp' => ["'date'"],
             'json', 'array' => ["'array'"],
-            'enum' => ["'string'"],
+            'enum' => $enumClass ? ['Rule::enum('.class_basename($enumClass).'::class)'] : ["'string'"],
             default => ["'string'"],
         };
 
@@ -179,6 +179,74 @@ trait InteractsWithFields
         }
 
         return '['.implode(', ', [$presence, ...$rules]).']';
+    }
+
+    /**
+     * Enum of an enum field: App\Enums\<Model><Field> (PostStatus), then App\Enums\<Field> (Status).
+     * Read from the files: the generators run before composer dumps the autoloader.
+     *
+     * @param  Field  $field
+     */
+    protected function enumClass(array $field, ?string $model): ?string
+    {
+        if ($field['type'] !== 'enum') {
+            return null;
+        }
+
+        $names = array_filter([$model ? $model.Str::studly($field['name']) : null, Str::studly($field['name'])]);
+
+        foreach ($names as $name) {
+            if (is_file($this->laravel->path("Enums/{$name}.php"))) {
+                return $this->rootNamespace().'\\Enums\\'.$name;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether an enum defines a method, directly or through the HasOptions trait (options()).
+     */
+    protected function enumHas(string $enumClass, string $method): bool
+    {
+        $path = $this->laravel->path('Enums/'.class_basename($enumClass).'.php');
+        $source = is_file($path) ? (string) file_get_contents($path) : '';
+
+        return str_contains($source, "function {$method}(")
+            || ($method === 'options' && str_contains($source, 'use HasOptions;'));
+    }
+
+    /**
+     * BelongsTo relation of a foreign key: author_id → author.
+     *
+     * @param  Field  $field
+     */
+    protected function relationName(array $field): string
+    {
+        return Str::camel(Str::beforeLast($field['name'], '_id'));
+    }
+
+    /**
+     * Column shown for a related record: the first of name, title, label, full_name or email
+     * among its fillable attributes, otherwise its id.
+     */
+    protected function relatedLabelColumn(string $relatedClass): string
+    {
+        try {
+            $fillable = class_exists($relatedClass) && is_subclass_of($relatedClass, Model::class)
+                ? (new $relatedClass)->getFillable()
+                : [];
+        } catch (Throwable) {
+            $fillable = [];
+        }
+
+        foreach (['name', 'title', 'label', 'full_name', 'email'] as $column) {
+            if (in_array($column, $fillable, true)) {
+                return $column;
+            }
+        }
+
+        return 'id';
     }
 
     /**

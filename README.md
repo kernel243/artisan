@@ -191,6 +191,11 @@ With `--policy`, the CRUD also gets its policy and permissions (`kernel:policy`)
 
 The written files are formatted with the project's Pint and Prettier when they are installed (`--no-format` to skip). Then run `php artisan migrate` and `php artisan wayfinder:generate`.
 
+Foreign keys and enums are edited through selects:
+
+- `author_id:foreignId` adds an `author()` `BelongsTo` relation to the model; the controller passes `authorOptions` (read from `Author`, labelled by its `name`, `title`, `label`, `full_name` or `email` column) and the list shows the author instead of its id;
+- `status:enum` uses `App\Enums\PostStatus` (or `App\Enums\Status`) when it exists, for instance created beforehand with `kernel:enum PostStatus --cases="draft,published"`: enum cast on the model, `Rule::enum()` in the requests, enum type in the DTO, `statusOptions` (`options()` of `HasOptions`) in the form and `label()` in the list.
+
 Labels (`Title`, `Author`…) come from the field names: translate them. JSON fields are stored but left out of the form.
 
 ### Policy
