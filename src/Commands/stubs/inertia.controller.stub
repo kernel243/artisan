@@ -28,7 +28,7 @@ DummyRowPropsDummyRowCan
 
     public function create(): Response
     {DummyAuthorizeCreate
-        return Inertia::render('DummyFormComponent');
+        return Inertia::render('DummyFormComponent'DummyCreateOptions);
     }
 
     public function store(StoreDummyModelRequest $request, DummyCreateAction $action): RedirectResponse
@@ -43,7 +43,7 @@ DummyRowPropsDummyRowCan
         return Inertia::render('DummyFormComponent', [
             'DummyVariable' => [
 DummyEditProps
-            ],
+            ],DummyEditOptions
         ]);
     }
 
@@ -60,4 +60,4 @@ DummyEditProps
 
         return to_route('DummyIndexRoute')DummyDeletedFlash;
     }
-}
+DummyFormOptionsMethod}

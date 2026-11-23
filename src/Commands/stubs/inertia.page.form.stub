@@ -12,7 +12,7 @@ import DummyRoutes from 'DummyRoutesImport';
  */
 type DummyModelForm = {
 DummyModelType
-};
+};DummyOptionType
 
 defineOptions({
     layout: {
@@ -21,7 +21,7 @@ defineOptions({
 });
 
 const props = defineProps<{
-    DummyVariable?: DummyModelForm;
+    DummyVariable?: DummyModelForm;DummyOptionProps
 }>();
 
 const form = useForm({
