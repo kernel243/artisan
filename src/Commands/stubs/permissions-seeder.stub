@@ -1,0 +1,24 @@
+<?php
+
+namespace Database\Seeders;
+
+use DummyRegistryClass;
+use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
+
+/**
+ * Crée les permissions de PermissionRegistry. Idempotent : peut être relancé
+ * à chaque déploiement. Les rôles et leurs permissions restent à définir ici.
+ */
+class RolesAndPermissionsSeeder extends Seeder
+{
+    public function run(): void
+    {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        foreach (array_keys(PermissionRegistry::all()) as $name) {
+            Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
+        }
+    }
+}

@@ -5,10 +5,12 @@ namespace Kernel243\Artisan\Commands;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Kernel243\Artisan\Commands\Concerns\InteractsWithFields;
+use Kernel243\Artisan\Commands\Concerns\InteractsWithPermissions;
 
 class RequestMakeCommand extends BaseCommand
 {
     use InteractsWithFields;
+    use InteractsWithPermissions;
 
     protected $signature = 'kernel:request {model : The model the requests validate (e.g. Post)}
                             {--fields= : Comma-separated fields, e.g. "title:string,email:email:unique,bio:text?"}
@@ -59,7 +61,7 @@ class RequestMakeCommand extends BaseCommand
         $table = Str::snake(Str::plural($model));
         // Route::resource('blog-posts') names its parameter blog_post.
         $routeParameter = $kind === 'update' ? Str::snake($model) : null;
-        $permission = Str::kebab(Str::plural($model)).'.'.($kind === 'store' ? 'create' : 'update');
+        $permission = $this->permissionName($model, $kind === 'store' ? 'create' : 'update');
         $inController = (bool) $this->laravel['config']->get('kernel-artisan.requests.authorize_in_controller', true);
 
         $rules = array_map(
