@@ -11,7 +11,7 @@ DummyImports
 class DummyClass extends Controller
 {
     public function index(Request $request): Response
-    {
+    {DummyAuthorizeIndex
         $search = $request->string('search')->trim()->value();
 
         return Inertia::render('DummyIndexComponent', [
@@ -20,26 +20,26 @@ class DummyClass extends Controller
                 ->paginate(DummyPerPage)
                 ->withQueryString()
                 ->through(fn (DummyModel $DummyVariable): array => [
-DummyRowProps
+DummyRowPropsDummyRowCan
                 ]),
-            'filters' => ['search' => $search],
+            'filters' => ['search' => $search],DummyCanProps
         ]);
     }
 
     public function create(): Response
-    {
+    {DummyAuthorizeCreate
         return Inertia::render('DummyFormComponent');
     }
 
     public function store(StoreDummyModelRequest $request, DummyCreateAction $action): RedirectResponse
-    {
+    {DummyAuthorizeCreate
         DummyCreateCall;
 
         return to_route('DummyIndexRoute')DummyCreatedFlash;
     }
 
     public function edit(DummyModel $DummyVariable): Response
-    {
+    {DummyAuthorizeUpdate
         return Inertia::render('DummyFormComponent', [
             'DummyVariable' => [
 DummyEditProps
@@ -48,14 +48,14 @@ DummyEditProps
     }
 
     public function update(UpdateDummyModelRequest $request, DummyModel $DummyVariable, DummyUpdateAction $action): RedirectResponse
-    {
+    {DummyAuthorizeUpdate
         DummyUpdateCall;
 
         return to_route('DummyIndexRoute')DummyUpdatedFlash;
     }
 
     public function destroy(DummyModel $DummyVariable, DummyDeleteAction $action): RedirectResponse
-    {
+    {DummyAuthorizeDelete
         DummyDeleteCall;
 
         return to_route('DummyIndexRoute')DummyDeletedFlash;

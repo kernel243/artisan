@@ -6,6 +6,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Kernel243\Artisan\Commands\Concerns\InteractsWithFields;
+use Kernel243\Artisan\Commands\Concerns\InteractsWithPermissions;
 use Spatie\LaravelData\Data;
 
 /**
@@ -18,6 +19,7 @@ use Spatie\LaravelData\Data;
 class InertiaCrudMakeCommand extends BaseCommand
 {
     use InteractsWithFields;
+    use InteractsWithPermissions;
 
     /**
      * Fields typed as text in the list: too long for a table cell.
@@ -27,6 +29,7 @@ class InertiaCrudMakeCommand extends BaseCommand
     protected $signature = 'kernel:inertia-crud {name : The model name (e.g. Post)}
                             {--fields= : Comma-separated fields, e.g. "title:string,email:email:unique,bio:text?,author_id:foreignId"}
                             {--zone= : Area of the application (e.g. admin): Http/Controllers/Admin, pages admin/..., routes admin.*}
+                            {--policy : Also generate the policy and its permissions (kernel:policy), and authorize every action}
                             {--no-tests : Do not generate the Pest tests}
                             {--no-format : Do not run Pint and Prettier on the generated files}
                             {--force : Overwrite the files if they already exist}
@@ -336,6 +339,10 @@ class InertiaCrudMakeCommand extends BaseCommand
 
         $this->call('kernel:request', ['model' => $model, ...$fields, ...$common]);
 
+        if ($this->usesPolicy()) {
+            $this->call('kernel:policy', ['model' => $model, ...$common]);
+        }
+
         foreach (['Create', 'Update', 'Delete'] as $verb) {
             $this->call('kernel:action', array_filter([
                 'name' => $verb.$model,
@@ -375,6 +382,10 @@ class InertiaCrudMakeCommand extends BaseCommand
             $imports[] = $this->rootNamespace().'\\Data\\'.Str::plural($model).'\\'.$dataClass;
         }
 
+        if ($this->usesPolicy()) {
+            $imports[] = 'Illuminate\\Support\\Facades\\Gate';
+        }
+
         // The application base controller when it exists (imported from a zone namespace).
         if (! is_file($this->laravel->path('Http/Controllers/Controller.php'))) {
             $imports[] = 'Illuminate\\Routing\\Controller';
@@ -410,7 +421,47 @@ class InertiaCrudMakeCommand extends BaseCommand
             'DummyCreatedFlash' => $this->flash('Enregistrement créé avec succès.'),
             'DummyUpdatedFlash' => $this->flash('Enregistrement mis à jour.'),
             'DummyDeletedFlash' => $this->flash('Enregistrement supprimé.'),
+            ...$this->authorizations(),
         ]), 'Controller');
+    }
+
+    /**
+     * Gate::authorize() calls and "can" props of the controller (--policy).
+     *
+     * @return array<string, string>
+     */
+    protected function authorizations(): array
+    {
+        $model = $this->names['model'];
+        $variable = '$'.$this->names['variable'];
+        $keys = ['DummyAuthorizeIndex', 'DummyAuthorizeCreate', 'DummyAuthorizeUpdate', 'DummyAuthorizeDelete', 'DummyRowCan', 'DummyCanProps'];
+
+        if (! $this->usesPolicy()) {
+            return array_fill_keys($keys, '');
+        }
+
+        $gate = fn (string $ability, string $subject) => "\n        Gate::authorize('{$ability}', {$subject});\n";
+
+        return [
+            'DummyAuthorizeIndex' => $gate('viewAny', "{$model}::class"),
+            'DummyAuthorizeCreate' => $gate('create', "{$model}::class"),
+            'DummyAuthorizeUpdate' => $gate('update', $variable),
+            'DummyAuthorizeDelete' => $gate('delete', $variable),
+            // Lets the page hide the buttons; the policy still protects the routes.
+            'DummyRowCan' => implode("\n", [
+                '',
+                "                    'can' => [",
+                "                        'update' => \$request->user()->can('update', {$variable}),",
+                "                        'delete' => \$request->user()->can('delete', {$variable}),",
+                '                    ],',
+            ]),
+            'DummyCanProps' => "\n            'can' => ['create' => \$request->user()->can('create', {$model}::class)],",
+        ];
+    }
+
+    protected function usesPolicy(): bool
+    {
+        return (bool) ($this->option('policy') ?: $this->laravel['config']->get('kernel-artisan.inertia.policy', false));
     }
 
     /**
@@ -633,6 +684,7 @@ class InertiaCrudMakeCommand extends BaseCommand
             'DummyCells' => $this->indexCells(),
             'DummyColspan' => (string) (count($this->listFields()) + 1),
             'DummySearchBlock' => $this->searchField() === null ? '' : $this->render($this->getStubContent('inertia.page.search'), $replacements),
+            ...$this->indexButtons(),
         ]);
 
         $form = $this->render($this->getStubContent('inertia.page.form'), $replacements + [
@@ -647,6 +699,32 @@ class InertiaCrudMakeCommand extends BaseCommand
 
         $this->generate("{$directory}/Index.vue", $this->applyLayout($index, $layout), 'Index page');
         $this->generate("{$directory}/Form.vue", $this->applyLayout($form, $layout), 'Form page');
+    }
+
+    /**
+     * Action buttons of the list, shown according to the "can" props with --policy.
+     *
+     * @return array<string, string>
+     */
+    protected function indexButtons(): array
+    {
+        $policy = $this->usesPolicy();
+        $variable = $this->names['variable'];
+        $if = fn (string $condition) => $policy ? ["v-if=\"{$condition}\""] : [];
+
+        return [
+            'DummyRowCanType' => $policy ? "\n    can: { update: boolean; delete: boolean };" : '',
+            'DummyCanType' => $policy ? "\n    can: { create: boolean };" : '',
+            'DummyCreateButton' => $this->element('Button', [...$if('can.create'), 'as-child'], 12, false),
+            'DummyEditButton' => $this->element('Button', [...$if("{$variable}.can.update"), 'variant="ghost"', 'size="icon"', 'as-child'], 32, false),
+            'DummyDeleteButton' => $this->element('Button', [
+                ...$if("{$variable}.can.delete"),
+                'variant="ghost"',
+                'size="icon"',
+                'aria-label="Supprimer"',
+                "@click=\"destroy({$variable})\"",
+            ], 32, false),
+        ];
     }
 
     /**
@@ -805,10 +883,10 @@ class InertiaCrudMakeCommand extends BaseCommand
      *
      * @param  list<string>  $attributes
      */
-    protected function element(string $tag, array $attributes, int $indent): string
+    protected function element(string $tag, array $attributes, int $indent, bool $selfClosing = true): string
     {
         $pad = str_repeat(' ', $indent);
-        $line = "{$pad}<{$tag} ".implode(' ', $attributes).' />';
+        $line = "{$pad}<{$tag} ".implode(' ', $attributes).($selfClosing ? ' />' : '>');
 
         if (mb_strlen($line) <= 80) {
             return $line;
@@ -817,7 +895,7 @@ class InertiaCrudMakeCommand extends BaseCommand
         return implode("\n", [
             "{$pad}<{$tag}",
             ...array_map(fn (string $attribute) => "{$pad}    {$attribute}", $attributes),
-            "{$pad}/>",
+            $selfClosing ? "{$pad}/>" : "{$pad}>",
         ]);
     }
 
@@ -836,8 +914,23 @@ class InertiaCrudMakeCommand extends BaseCommand
             fn (array $field) => $field['type'] === 'password',
         ));
 
+        $imports = [
+            $this->rootNamespace().'\\Models\\'.$model,
+            (string) $this->laravel['config']->get('auth.providers.users.model', $this->rootNamespace().'\\Models\\User'),
+            'Illuminate\\Support\\Arr',
+            'Inertia\\Testing\\AssertableInertia as Assert',
+        ];
+
+        if ($this->usesPolicy()) {
+            $imports[] = 'Spatie\\Permission\\Models\\Permission';
+        }
+
+        $imports = array_values(array_unique($imports));
+        sort($imports);
+
         $replacements = [
-            'DummyModelClass' => $this->rootNamespace().'\\Models\\'.$model,
+            'DummyImports' => implode("\n", array_map(fn (string $import) => "use {$import};", $imports)),
+            'DummyActingAs' => $this->actingAs(),
             'DummyModel' => $model,
             'DummyVariable' => $variable,
             'DummyTable' => $this->names['table'],
@@ -850,6 +943,10 @@ class InertiaCrudMakeCommand extends BaseCommand
             'DummyPluralVariable' => $this->names['plural'],
         ];
 
+        $replacements['DummyForbiddenTest'] = $this->usesPolicy()
+            ? $this->render($this->getStubContent('inertia.test.forbidden'), $replacements)
+            : '';
+
         $replacements['DummyEmptyTest'] = $this->hasRequiredField()
             ? $this->render($this->getStubContent('inertia.test.empty'), $replacements)
             : '';
@@ -857,6 +954,31 @@ class InertiaCrudMakeCommand extends BaseCommand
         $path = $this->laravel->basePath('tests/Feature/'.($this->zone['studly'] ? $this->zone['studly'].'/' : '')."{$model}ControllerTest.php");
 
         $this->generate($path, $this->render($this->getStubContent('inertia.test'), $replacements), 'Test');
+    }
+
+    /**
+     * The tests act as a user holding every permission of the module (--policy).
+     */
+    protected function actingAs(): string
+    {
+        if (! $this->usesPolicy()) {
+            return '    $this->actingAs(User::factory()->create());';
+        }
+
+        $permissions = array_map(
+            fn (string $ability) => "'".$this->permissionName($this->names['model'], $ability)."'",
+            ['view', 'create', 'update', 'delete'],
+        );
+
+        return implode("\n", [
+            '    $permissions = ['.implode(', ', $permissions).'];',
+            '',
+            '    foreach ($permissions as $permission) {',
+            "        Permission::findOrCreate(\$permission, 'web');",
+            '    }',
+            '',
+            '    $this->actingAs(User::factory()->create()->givePermissionTo($permissions));',
+        ]);
     }
 
     /**
