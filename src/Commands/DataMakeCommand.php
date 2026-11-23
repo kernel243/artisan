@@ -66,8 +66,17 @@ class DataMakeCommand extends BaseCommand
         $imports = ['Spatie\\LaravelData\\Data'];
         $properties = [];
 
+        $model = $modelClass ? $this->classBasename($modelClass) : Str::before(Str::before($target['class'], 'UpdateData'), 'Data');
+
         foreach ($fields as $field) {
             $type = $this->phpType($field);
+            $enum = $this->enumClass($field, $model);
+
+            // laravel-data casts the submitted value to the enum, toArray() gives the value back.
+            if ($enum !== null) {
+                $imports[] = $enum;
+                $type = class_basename($enum);
+            }
 
             $types = [$type];
 

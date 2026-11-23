@@ -64,10 +64,17 @@ class RequestMakeCommand extends BaseCommand
         $permission = $this->permissionName($model, $kind === 'store' ? 'create' : 'update');
         $inController = (bool) $this->laravel['config']->get('kernel-artisan.requests.authorize_in_controller', true);
 
-        $rules = array_map(
-            fn (array $field) => "            '{$field['name']}' => ".$this->validationRules($field, $table, $routeParameter).',',
-            $fields,
-        );
+        $enums = [];
+
+        $rules = array_map(function (array $field) use ($table, $routeParameter, $model, &$enums) {
+            $enum = $this->enumClass($field, $model);
+
+            if ($enum !== null) {
+                $enums[] = $enum;
+            }
+
+            return "            '{$field['name']}' => ".$this->validationRules($field, $table, $routeParameter, $enum).',';
+        }, $fields);
 
         $attributes = array_map(
             fn (array $field) => "            '{$field['name']}' => '".str_replace("'", "\\'", Str::lower($this->fieldLabel($field['name'])))."',",
@@ -85,10 +92,20 @@ class RequestMakeCommand extends BaseCommand
             'DummyAttributes' => $attributes === [] ? "            // 'name' => 'nom'," : implode("\n", $attributes),
         ]);
 
-        // Drop the Rule import when no rule needs it.
-        if (! str_contains(Str::after($content, 'class '), 'Rule::')) {
-            $content = str_replace("use Illuminate\\Validation\\Rule;\n", '', $content);
+        // Drop the Rule import when no rule needs it, import the enums.
+        $imports = ['Illuminate\\Foundation\\Http\\FormRequest', ...array_unique($enums)];
+
+        if (str_contains(Str::after($content, 'class '), 'Rule::')) {
+            $imports[] = 'Illuminate\\Validation\\Rule';
         }
+
+        sort($imports);
+
+        $content = str_replace(
+            "use Illuminate\\Foundation\\Http\\FormRequest;\nuse Illuminate\\Validation\\Rule;\n",
+            implode('', array_map(fn (string $import) => "use {$import};\n", $imports)),
+            $content,
+        );
 
         return $content;
     }
