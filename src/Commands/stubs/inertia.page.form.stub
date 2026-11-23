@@ -1,0 +1,61 @@
+<script setup lang="ts">
+import { Head, Link, useForm } from '@inertiajs/vue3';
+import InputError from '@/components/InputError.vue';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import DummyRoutes from 'DummyRoutesImport';
+
+/**
+ * Création et modification partagent ce formulaire : la page reçoit
+ * l'enregistrement à modifier, ou rien pour une création.
+ */
+type DummyModelForm = {
+DummyModelType
+};
+
+defineOptions({
+    layout: {
+        breadcrumbs: [{ title: 'DummyLabel', href: DummyRoutes.index() }],
+    },
+});
+
+const props = defineProps<{
+    DummyVariable?: DummyModelForm;
+}>();
+
+const form = useForm({
+DummyFormDefaults
+});
+
+function submit(): void {
+    if (props.DummyVariable) {
+        form.submit(DummyRoutes.update(props.DummyVariable.id));
+    } else {
+        form.submit(DummyRoutes.store());
+    }
+}
+</script>
+
+<template>
+    <Head :title="DummyVariable ? 'Modifier' : 'Ajouter'" />
+
+    <div class="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        <h1 class="text-xl font-semibold">
+            {{ DummyVariable ? 'Modifier' : 'Ajouter' }}
+        </h1>
+
+        <form class="grid max-w-2xl gap-6" @submit.prevent="submit">
+DummyInputs
+
+            <div class="flex items-center gap-3">
+                <Button type="submit" :disabled="form.processing">
+                    Enregistrer
+                </Button>
+                <Button variant="ghost" as-child>
+                    <Link :href="DummyRoutes.index()">Annuler</Link>
+                </Button>
+            </div>
+        </form>
+    </div>
+</template>

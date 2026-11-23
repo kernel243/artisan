@@ -1,0 +1,63 @@
+<?php
+
+namespace DummyNamespace;
+
+DummyImports
+
+/**
+ * Écrans de gestion DummyModel : le contrôleur reste fin, il valide par une
+ * FormRequest et délègue l'écriture aux actions.
+ */
+class DummyClass extends Controller
+{
+    public function index(Request $request): Response
+    {
+        $search = $request->string('search')->trim()->value();
+
+        return Inertia::render('DummyIndexComponent', [
+            'DummyPluralVariable' => DummyModel::query()DummySearch
+                ->latest()
+                ->paginate(DummyPerPage)
+                ->withQueryString()
+                ->through(fn (DummyModel $DummyVariable): array => [
+DummyRowProps
+                ]),
+            'filters' => ['search' => $search],
+        ]);
+    }
+
+    public function create(): Response
+    {
+        return Inertia::render('DummyFormComponent');
+    }
+
+    public function store(StoreDummyModelRequest $request, DummyCreateAction $action): RedirectResponse
+    {
+        DummyCreateCall;
+
+        return to_route('DummyIndexRoute')DummyCreatedFlash;
+    }
+
+    public function edit(DummyModel $DummyVariable): Response
+    {
+        return Inertia::render('DummyFormComponent', [
+            'DummyVariable' => [
+DummyEditProps
+            ],
+        ]);
+    }
+
+    public function update(UpdateDummyModelRequest $request, DummyModel $DummyVariable, DummyUpdateAction $action): RedirectResponse
+    {
+        DummyUpdateCall;
+
+        return to_route('DummyIndexRoute')DummyUpdatedFlash;
+    }
+
+    public function destroy(DummyModel $DummyVariable, DummyDeleteAction $action): RedirectResponse
+    {
+        DummyDeleteCall;
+
+        return to_route('DummyIndexRoute')DummyDeletedFlash;
+    }
+}

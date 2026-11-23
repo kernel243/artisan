@@ -1,0 +1,23 @@
+<?php
+
+namespace Database\Factories;
+
+DummyImports
+
+/**
+ * @extends Factory<DummyModel>
+ */
+class DummyModelFactory extends Factory
+{
+    protected $model = DummyModel::class;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+DummyDefinition
+        ];
+    }
+}

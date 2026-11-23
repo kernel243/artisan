@@ -48,6 +48,13 @@ abstract class BaseCommand extends Command
     /**
      * Write a generated file, asking before overwriting an existing one.
      */
+    /**
+     * Files written during the current run, sub-commands included (see kernel:inertia-crud --format).
+     *
+     * @var list<string>
+     */
+    protected static array $written = [];
+
     protected function generate(string $path, string $content, string $label): bool
     {
         $relative = $this->relativePath($path);
@@ -72,6 +79,7 @@ abstract class BaseCommand extends Command
 
         $this->files()->ensureDirectoryExists(dirname($path));
         $this->files()->put($path, $content);
+        static::$written[] = $path;
         $this->info("{$label} created: {$relative}");
 
         return true;

@@ -1,0 +1,7 @@
+it('refuse un formulaire vide', function () {
+    $this->post(route('DummyRoutePrefix.store'), [])
+        ->assertSessionHasErrors();
+
+    expect(DummyModel::query()->count())->toBe(0);
+});
+
