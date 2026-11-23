@@ -57,7 +57,8 @@ class RequestMakeCommand extends BaseCommand
     protected function buildRequest(array $target, string $model, array $fields, string $kind): string
     {
         $table = Str::snake(Str::plural($model));
-        $routeParameter = $kind === 'update' ? Str::camel($model) : null;
+        // Route::resource('blog-posts') names its parameter blog_post.
+        $routeParameter = $kind === 'update' ? Str::snake($model) : null;
         $permission = Str::kebab(Str::plural($model)).'.'.($kind === 'store' ? 'create' : 'update');
         $inController = (bool) $this->laravel['config']->get('kernel-artisan.requests.authorize_in_controller', true);
 

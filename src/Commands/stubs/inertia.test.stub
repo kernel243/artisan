@@ -1,0 +1,66 @@
+<?php
+
+use DummyModelClass;
+use App\Models\User;
+use Illuminate\Support\Arr;
+use Inertia\Testing\AssertableInertia as Assert;
+
+beforeEach(function () {
+    $this->actingAs(User::factory()->create());
+});
+
+/**
+ * Données valides d'un formulaire DummyModel, tirées de la factory.
+ *
+ * @return array<string, mixed>
+ */
+function validDummyModelPayload(): array
+{
+    return [
+        ...Arr::only(DummyModel::factory()->make()->toArray(), [DummyPayloadFields]),
+DummyPasswords
+    ];
+}
+
+it('affiche la liste des DummyLowerLabel', function () {
+    DummyModel::factory()->count(3)->create();
+
+    $this->get(route('DummyRoutePrefix.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('DummyIndexComponent')
+            ->has('DummyPluralVariable.data', 3));
+});
+
+it('affiche le formulaire de création', function () {
+    $this->get(route('DummyRoutePrefix.create'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('DummyFormComponent'));
+});
+
+it('crée un enregistrement', function () {
+    $this->post(route('DummyRoutePrefix.store'), validDummyModelPayload())
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('DummyRoutePrefix.index'));
+
+    expect(DummyModel::query()->count())->toBe(1);
+});
+
+DummyEmptyTestit('met à jour un enregistrement', function () {
+    $DummyVariable = DummyModel::factory()->create();
+
+    $this->get(route('DummyRoutePrefix.edit', $DummyVariable))->assertOk();
+
+    $this->put(route('DummyRoutePrefix.update', $DummyVariable), validDummyModelPayload())
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('DummyRoutePrefix.index'));
+});
+
+it('supprime un enregistrement', function () {
+    $DummyVariable = DummyModel::factory()->create();
+
+    $this->delete(route('DummyRoutePrefix.destroy', $DummyVariable))
+        ->assertRedirect(route('DummyRoutePrefix.index'));
+
+    $this->assertSoftDeleted($DummyVariable);
+});

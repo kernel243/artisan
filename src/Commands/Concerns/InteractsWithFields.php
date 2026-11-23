@@ -129,6 +129,9 @@ trait InteractsWithFields
     /**
      * PHP type of a field in a DTO.
      *
+     * Dates stay strings: forms send "2026-11-23" or "2026-11-23T10:00", which the
+     * DATE_ATOM format of laravel-data rejects, and the model cast converts them anyway.
+     *
      * @param  Field  $field
      */
     protected function phpType(array $field): string
@@ -137,7 +140,6 @@ trait InteractsWithFields
             'integer', 'int', 'bigint', 'foreignid' => 'int',
             'decimal', 'float', 'double' => 'float',
             'boolean', 'bool', 'tinyint' => 'bool',
-            'date', 'datetime', 'timestamp' => 'CarbonInterface',
             'json', 'array' => 'array',
             default => 'string',
         };

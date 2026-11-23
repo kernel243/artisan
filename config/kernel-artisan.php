@@ -30,4 +30,21 @@ return [
         'authorize_in_controller' => true,
     ],
 
+    'inertia' => [
+        // Default area of kernel:inertia-crud (e.g. 'admin'): Http/Controllers/Admin, pages admin/..., routes admin.*.
+        'zone' => null,
+
+        // Case of the folders of resources/js/pages: 'kebab', 'studly', or null to detect it (Pages/ means studly).
+        'pages_case' => null,
+
+        // 'options': breadcrumbs through defineOptions (layout assigned in app.ts, recent starter kits).
+        // 'component': the page is wrapped in <AppLayout :breadcrumbs> (older starter kits).
+        'layout' => 'options',
+
+        // Flash key shared by HandleInertiaRequests: 'success', or 'toast' for ['type' => 'success', 'message' => ...].
+        'flash' => 'success',
+
+        'per_page' => 20,
+    ],
+
 ];

@@ -1,0 +1,7 @@
+
+        <Input
+            v-model="search"
+            placeholder="Rechercher…"
+            aria-label="Rechercher"
+            class="sm:max-w-xs"
+        />

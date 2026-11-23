@@ -1,0 +1,153 @@
+<script setup lang="ts">
+import { Head, Link, router } from '@inertiajs/vue3';
+import { Pencil, Plus, Trash2 } from '@lucide/vue';
+import { watchDebounced } from '@vueuse/core';
+import { ref } from 'vue';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import DummyRoutes from 'DummyRoutesImport';
+
+type DummyModelRow = {
+DummyRowType
+};
+
+type Paginated<T> = {
+    data: T[];
+    current_page: number;
+    last_page: number;
+    total: number;
+    prev_page_url: string | null;
+    next_page_url: string | null;
+};
+
+defineOptions({
+    layout: {
+        breadcrumbs: [{ title: 'DummyLabel', href: DummyRoutes.index() }],
+    },
+});
+
+const props = defineProps<{
+    DummyPluralVariable: Paginated<DummyModelRow>;
+    filters: { search?: string };
+}>();
+
+const search = ref(props.filters.search ?? '');
+
+watchDebounced(
+    search,
+    () => {
+        router.get(
+            DummyRoutes.index().url,
+            { search: search.value || undefined },
+            { preserveState: true, replace: true, preserveScroll: true },
+        );
+    },
+    { debounce: 300 },
+);
+
+function destroy(DummyVariable: DummyModelRow): void {
+    if (confirm('Supprimer cet enregistrement ?')) {
+        router.delete(DummyRoutes.destroy(DummyVariable.id).url, {
+            preserveScroll: true,
+        });
+    }
+}
+</script>
+
+<template>
+    <Head title="DummyLabel" />
+
+    <div class="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <h1 class="text-xl font-semibold">DummyLabel</h1>
+
+            <Button as-child>
+                <Link :href="DummyRoutes.create()">
+                    <Plus class="size-4" /> Ajouter
+                </Link>
+            </Button>
+        </div>
+DummySearchBlock
+        <div class="overflow-x-auto rounded-md border border-border">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-muted/50 text-muted-foreground">
+                    <tr>
+DummyHeaders
+                        <th class="px-4 py-3 text-right font-medium">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    <tr
+                        v-for="DummyVariable in DummyPluralVariable.data"
+                        :key="DummyVariable.id"
+                        class="hover:bg-muted/40"
+                    >
+DummyCells
+                        <td class="px-4 py-3">
+                            <div class="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" as-child>
+                                    <Link
+                                        :href="DummyRoutes.edit(DummyVariable.id)"
+                                        aria-label="Modifier"
+                                    >
+                                        <Pencil class="size-4" />
+                                    </Link>
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label="Supprimer"
+                                    @click="destroy(DummyVariable)"
+                                >
+                                    <Trash2 class="size-4" />
+                                </Button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr v-if="DummyPluralVariable.data.length === 0">
+                        <td
+                            colspan="DummyColspan"
+                            class="px-4 py-8 text-center text-muted-foreground"
+                        >
+                            Aucun enregistrement.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div
+            v-if="DummyPluralVariable.last_page > 1"
+            class="flex items-center justify-between text-sm text-muted-foreground"
+        >
+            <span>
+                Page {{ DummyPluralVariable.current_page }} sur
+                {{ DummyPluralVariable.last_page }}
+            </span>
+            <div class="flex gap-2">
+                <Button
+                    v-if="DummyPluralVariable.prev_page_url"
+                    variant="outline"
+                    size="sm"
+                    as-child
+                >
+                    <Link :href="DummyPluralVariable.prev_page_url" preserve-scroll>
+                        Précédent
+                    </Link>
+                </Button>
+                <Button
+                    v-if="DummyPluralVariable.next_page_url"
+                    variant="outline"
+                    size="sm"
+                    as-child
+                >
+                    <Link :href="DummyPluralVariable.next_page_url" preserve-scroll>
+                        Suivant
+                    </Link>
+                </Button>
+            </div>
+        </div>
+    </div>
+</template>

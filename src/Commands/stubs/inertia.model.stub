@@ -1,0 +1,42 @@
+<?php
+
+namespace DummyNamespace;
+
+use Database\Factories\DummyFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class DummyModel extends Model
+{
+    /** @use HasFactory<DummyFactory> */
+    use HasFactory;
+
+    use SoftDeletes;
+
+    /**
+     * @var list<string>
+     */
+    protected $fillable = [
+DummyFillable
+    ];
+
+    /**
+     * Les attributs masqués : ils ne quittent jamais le serveur.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+DummyHidden
+    ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+DummyCasts
+        ];
+    }
+}

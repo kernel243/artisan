@@ -44,6 +44,7 @@ All commands are prefixed with `kernel:`. The former `make:*` names are kept as 
 | `kernel:data`          | –                    | A spatie/laravel-data DTO (full or partial update)     |
 | `kernel:request`       | –                    | `Store<Model>Request` and `Update<Model>Request`       |
 | `kernel:enum`          | –                    | A string-backed enum with `label()` and `HasOptions`   |
+| `kernel:inertia-crud`  | –                    | An Inertia + Vue TypeScript CRUD, tests included       |
 
 Every generator accepts:
 
@@ -169,6 +170,26 @@ php artisan kernel:enum PaymentStatus --cases="pending,paid,failed"
 
 Generates a string-backed enum (`case Pending = 'pending';`), a `label()` method and the `App\Enums\Concerns\HasOptions` trait (`values()`, `options()` for selects).
 
+### Inertia CRUD
+
+```bash
+php artisan kernel:inertia-crud Post --fields="title:string,email:email:unique,body:text?,price:decimal,is_published:boolean,author_id:foreignId"
+php artisan kernel:inertia-crud Post --zone=admin      # Http/Controllers/Admin, pages admin/posts, routes admin.posts.*
+```
+
+Generates, for a Laravel + Inertia + Vue TypeScript application (official starter kit):
+
+- a migration (`foreignId()->constrained()`, `decimal(15, 2)`, `softDeletes()`), the model (`casts()`, `SoftDeletes`, `HasFactory`, `$hidden` for passwords) and its factory;
+- the `PostData` DTO, the `StorePostRequest` / `UpdatePostRequest` requests and the `CreatePostAction`, `UpdatePostAction`, `DeletePostAction` actions (same as `kernel:data`, `kernel:request` and `kernel:action`);
+- a thin controller: `Inertia::render()` with explicitly shaped props (`paginate()->withQueryString()->through()`), validation by the requests, writes by the actions, redirect with a flash message;
+- `Route::resource()->except('show')`, in `routes/<zone>.php` when it exists (mounted with its prefix and name), otherwise in an `auth` group of `routes/web.php`;
+- `resources/js/pages/posts/Index.vue` (debounced search, pagination, delete confirmation) and `Form.vue` (create and edit with `useForm`), using Wayfinder (`@/routes/posts`) and shadcn-vue components;
+- `tests/Feature/PostControllerTest.php`, Pest tests in French (list, form, create, validation, update, delete), when the project uses Pest.
+
+The written files are formatted with the project's Pint and Prettier when they are installed (`--no-format` to skip). Then run `php artisan migrate` and `php artisan wayfinder:generate`.
+
+Labels (`Title`, `Author`…) come from the field names: translate them. JSON fields are stored but left out of the form.
+
 ## Fields
 
 `--fields` takes `name:type[:modifier...]` separated by commas:
@@ -176,7 +197,7 @@ Generates a string-backed enum (`case Pending = 'pending';`), a `label()` method
 - types: `string`, `text`, `email`, `password`, `url`, `phone`, `uuid`, `integer`, `foreignId`, `decimal`, `float`, `boolean`, `date`, `datetime`, `json`, `enum`;
 - modifiers: `nullable` (or a trailing `?`: `bio:text?`) and `unique`.
 
-Without `--fields`, `kernel:data` and `kernel:request` read the fillable attributes and the casts of the existing model.
+Without `--fields`, `kernel:data`, `kernel:request` and `kernel:inertia-crud` read the fillable attributes and the casts of the existing model.
 
 ## Configuration
 
@@ -193,6 +214,11 @@ php artisan vendor:publish --tag=kernel-config
 | `actions.transaction` | `true` | Wrap create / update actions in `DB::transaction()` |
 | `data.enabled` | `true` | Use DTOs in actions when spatie/laravel-data is installed |
 | `requests.authorize_in_controller` | `true` | `authorize()` returns `true`; `false` generates `$this->user()?->can('posts.create')` |
+| `inertia.zone` | `null` | Default `--zone` of `kernel:inertia-crud` |
+| `inertia.pages_case` | `null` | `'kebab'` (`pages/admin/posts`), `'studly'` (`Pages/Admin/Posts`), `null` to detect it |
+| `inertia.layout` | `'options'` | `'options'`: breadcrumbs through `defineOptions()`; `'component'`: page wrapped in `<AppLayout>` |
+| `inertia.flash` | `'success'` | Flash key; `'toast'` gives `->with('toast', ['type' => 'success', 'message' => …])` |
+| `inertia.per_page` | `20` | Page size of the list |
 
 ## Modules
 
