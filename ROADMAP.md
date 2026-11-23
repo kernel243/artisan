@@ -30,9 +30,9 @@ Légende : ✅ fait · 🚧 en cours · ⏳ à faire. Priorité P1 (indispensabl
 | 2.3 | `kernel:request` | `Store<Modele>Request` / `Update<Modele>Request` : règles en tableau, `Rule::unique()->ignore()`, `messages()` / `attributes()` en français | P1 | ✅ |
 | 2.4 | `kernel:enum` | Enum string-backed (cases TitleCase, valeurs snake_case), `label()` en français, trait `HasOptions` (`values()`, `options()`) | P1 | ✅ |
 | 2.5 | `kernel:inertia-crud` | Le CRUD complet aux conventions : migration commentée, modèle (`casts()`, `SoftDeletes`, factory), DTO, requests, actions, contrôleur `Inertia::render` aux props façonnées (`through()`), routes de zone nommées, pages Vue TS (Index avec recherche différée et pagination, Form unique création / modification en `useForm` + Wayfinder), flash, tests Pest en français, formatage Pint / Prettier du projet | P1 | ✅ |
-| 2.5b | `kernel:inertia-crud` (suite) | Selects pour les clés étrangères et les enums (options passées par le contrôleur), page `Show`, policy et permissions branchées (avec 2.7), `--module` | P2 | ⏳ |
+| 2.5b | `kernel:inertia-crud` (suite) | Selects pour les clés étrangères et les enums (options passées par le contrôleur), page `Show`, `--tenant` (avec 2.12), `--module` | P2 | ⏳ |
 | 2.6 | `kernel:page` | Page Vue TS isolée (layout, breadcrumbs typés, `Head`) | P2 | ⏳ |
-| 2.7 | `kernel:policy` | Policy qui vérifie la permission **et** l'appartenance au tenant, ajout `module.action` dans le registre de permissions, seeder idempotent | P2 | ⏳ |
+| 2.7 | `kernel:policy` | Policy qui vérifie la permission **et** l'appartenance au tenant (404 pour un autre tenant, échec fermé), ajout au registre de permissions (`MODULES` ou `all()`, séparateur détecté), seeder idempotent ; `kernel:inertia-crud --policy` | P2 | ✅ |
 | 2.8 | `kernel:api` | Contrôleur `Api/V1` + `JsonResource` + routes `v1` avec `throttle` + tests | P2 | ⏳ |
 | 2.9 | `kernel:test` | Test Pest en français pour une action ou un contrôleur (cas nominal, validation, autorisation) | P2 | ⏳ |
 | 2.10 | `kernel:integration` | Pattern Manager : config `default` / `providers`, contrat, drivers, driver `log` hors production, binding (paiement, SMS, push) | P3 | ⏳ |
