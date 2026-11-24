@@ -6,15 +6,18 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Kernel243\Artisan\Commands\Concerns\InteractsWithFields;
 use Kernel243\Artisan\Commands\Concerns\InteractsWithPermissions;
+use Kernel243\Artisan\Commands\Concerns\InteractsWithTenancy;
 
 class RequestMakeCommand extends BaseCommand
 {
     use InteractsWithFields;
     use InteractsWithPermissions;
+    use InteractsWithTenancy;
 
     protected $signature = 'kernel:request {model : The model the requests validate (e.g. Post)}
                             {--fields= : Comma-separated fields, e.g. "title:string,email:email:unique,bio:text?"}
                             {--only= : Generate only the "store" or the "update" request}
+                            {--tenant= : Tenant column (e.g. organization_id): unique and exists rules only see the current tenant}
                             {--module= : The nwidart module where the requests will be created}
                             {--force : Overwrite the files if they already exist}
                             {--dry-run : Display the generated files without writing them}';
@@ -35,7 +38,12 @@ class RequestMakeCommand extends BaseCommand
             $module = $this->option('module') ?: null;
             [, $model] = $this->parseName($this->argument('model'));
             $modelClass = $this->resolveModel($model, $module);
-            $fields = $this->resolveFields($this->option('fields'), $modelClass);
+            $tenancy = $this->tenancy($this->option('tenant') ?: null);
+            // The tenant column is filled from the current tenant, never from the form.
+            $fields = array_values(array_filter(
+                $this->resolveFields($this->option('fields'), $modelClass),
+                fn (array $field) => $field['name'] !== ($tenancy['column'] ?? null),
+            ));
         } catch (InvalidArgumentException $e) {
             $this->error($e->getMessage());
 
@@ -45,7 +53,7 @@ class RequestMakeCommand extends BaseCommand
         foreach (['store', 'update'] as $kind) {
             if ($only === null || $only === $kind) {
                 $target = $this->classTarget(Str::plural($model).'/'.Str::studly($kind).$model.'Request', 'Http/Requests', $module);
-                $this->generate($target['path'], $this->buildRequest($target, $model, $fields, $kind), Str::studly($kind).' request');
+                $this->generate($target['path'], $this->buildRequest($target, $model, $fields, $kind, $tenancy), Str::studly($kind).' request');
             }
         }
 
@@ -55,8 +63,9 @@ class RequestMakeCommand extends BaseCommand
     /**
      * @param  array{path: string, namespace: string, class: string}  $target
      * @param  list<array{name: string, type: string, nullable: bool, unique: bool}>  $fields
+     * @param  array{column: string, trait: string, manager: string}|null  $tenancy
      */
-    protected function buildRequest(array $target, string $model, array $fields, string $kind): string
+    protected function buildRequest(array $target, string $model, array $fields, string $kind, ?array $tenancy = null): string
     {
         $table = Str::snake(Str::plural($model));
         // Route::resource('blog-posts') names its parameter blog_post.
@@ -66,14 +75,16 @@ class RequestMakeCommand extends BaseCommand
 
         $enums = [];
 
-        $rules = array_map(function (array $field) use ($table, $routeParameter, $model, &$enums) {
+        $rules = array_map(function (array $field) use ($table, $routeParameter, $model, $tenancy, &$enums) {
             $enum = $this->enumClass($field, $model);
 
             if ($enum !== null) {
                 $enums[] = $enum;
             }
 
-            return "            '{$field['name']}' => ".$this->validationRules($field, $table, $routeParameter, $enum).',';
+            $tenantRelation = $tenancy !== null && $field['type'] === 'foreignid' && $this->isTenantModel($field, $tenancy);
+
+            return "            '{$field['name']}' => ".$this->validationRules($field, $table, $routeParameter, $enum, $tenancy['column'] ?? null, $tenantRelation).',';
         }, $fields);
 
         $attributes = array_map(
@@ -99,6 +110,10 @@ class RequestMakeCommand extends BaseCommand
             $imports[] = 'Illuminate\\Validation\\Rule';
         }
 
+        if ($tenancy !== null && str_contains($content, 'TenantManager::class')) {
+            $imports[] = $tenancy['manager'];
+        }
+
         sort($imports);
 
         $content = str_replace(
@@ -108,5 +123,18 @@ class RequestMakeCommand extends BaseCommand
         );
 
         return $content;
+    }
+
+    /**
+     * A related model isolated by the same tenant trait: its records are only valid within the tenant.
+     *
+     * @param  array{name: string}  $field
+     * @param  array{trait: string}  $tenancy
+     */
+    protected function isTenantModel(array $field, array $tenancy): bool
+    {
+        $path = $this->laravel->path('Models/'.Str::studly(Str::beforeLast($field['name'], '_id')).'.php');
+
+        return is_file($path) && str_contains((string) file_get_contents($path), "use {$tenancy['trait']};");
     }
 }
