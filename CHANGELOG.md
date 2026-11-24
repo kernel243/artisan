@@ -5,6 +5,7 @@
 ### Added
 - `kernel:action`, `kernel:data`, `kernel:request` and `kernel:enum` generators.
 - `kernel:inertia-crud`: Inertia + Vue TypeScript CRUD (migration, model, factory, DTO, requests, actions, controller, routes, Wayfinder pages, Pest tests), formatted with the project's Pint and Prettier; `--policy` authorizes every action; foreign keys and enums are edited through selects (BelongsTo relation, enum cast, `Rule::enum()`).
+- `kernel:tenant`: row-level tenancy (`TenantManager`, `BelongsTo<Tenant>` trait whose global scope fails closed, users column, scoped binding); `kernel:inertia-crud --tenant` and `kernel:request --tenant` isolate the records, unique and exists rules per tenant.
 - `kernel:policy`: permission per ability, optional tenant check (404 for another tenant), permissions added to `App\Support\PermissionRegistry` (created with its seeder when missing).
 - Publishable configuration `config/kernel-artisan.php` (`vendor:publish --tag=kernel-config`).
 - Richer `--fields` syntax (`nullable`, `unique`, `?`) and field inference from an existing model.

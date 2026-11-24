@@ -150,8 +150,11 @@ trait InteractsWithFields
      *
      * @param  Field  $field
      */
-    protected function validationRules(array $field, string $table, ?string $ignoreRouteParameter = null, ?string $enumClass = null): string
+    protected function validationRules(array $field, string $table, ?string $ignoreRouteParameter = null, ?string $enumClass = null, ?string $tenantColumn = null, bool $tenantRelation = false): string
     {
+        // Scoped to the current tenant: a value only clashes with, or refers to, a record of the same tenant.
+        $tenantScope = $tenantColumn !== null ? "->where('{$tenantColumn}', app(TenantManager::class)->id())" : '';
+
         $presence = $field['nullable'] ? "'nullable'" : (in_array($field['type'], ['boolean', 'bool', 'tinyint'], true) ? "'sometimes'" : "'required'");
 
         $rules = match ($field['type']) {
@@ -162,7 +165,7 @@ trait InteractsWithFields
             'url' => ["'url'", "'max:2048'"],
             'uuid' => ["'uuid'"],
             'integer', 'int', 'bigint' => ["'integer'"],
-            'foreignid' => ["'integer'", "Rule::exists('".Str::plural(Str::beforeLast($field['name'], '_id'))."', 'id')"],
+            'foreignid' => ["'integer'", "Rule::exists('".Str::plural(Str::beforeLast($field['name'], '_id'))."', 'id')".($tenantRelation ? $tenantScope : '')],
             'decimal', 'float', 'double' => ["'numeric'", "'min:0'"],
             'boolean', 'bool', 'tinyint' => ["'boolean'"],
             'date' => ["'date'"],
@@ -173,9 +176,8 @@ trait InteractsWithFields
         };
 
         if ($field['unique']) {
-            $rules[] = $ignoreRouteParameter
-                ? "Rule::unique('{$table}', '{$field['name']}')->ignore(\$this->route('{$ignoreRouteParameter}'))"
-                : "Rule::unique('{$table}', '{$field['name']}')";
+            $rules[] = "Rule::unique('{$table}', '{$field['name']}')".$tenantScope
+                .($ignoreRouteParameter ? "->ignore(\$this->route('{$ignoreRouteParameter}'))" : '');
         }
 
         return '['.implode(', ', [$presence, ...$rules]).']';

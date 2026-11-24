@@ -46,6 +46,7 @@ All commands are prefixed with `kernel:`. The former `make:*` names are kept as 
 | `kernel:enum`          | –                    | A string-backed enum with `label()` and `HasOptions`   |
 | `kernel:inertia-crud`  | –                    | An Inertia + Vue TypeScript CRUD, tests included       |
 | `kernel:policy`        | –                    | A policy backed by permissions, optionally per tenant  |
+| `kernel:tenant`        | –                    | Row-level tenancy: `TenantManager`, fail-closed trait  |
 
 Every generator accepts:
 
@@ -196,6 +197,14 @@ Foreign keys and enums are edited through selects:
 - `author_id:foreignId` adds an `author()` `BelongsTo` relation to the model; the controller passes `authorOptions` (read from `Author`, labelled by its `name`, `title`, `label`, `full_name` or `email` column) and the list shows the author instead of its id;
 - `status:enum` uses `App\Enums\PostStatus` (or `App\Enums\Status`) when it exists, for instance created beforehand with `kernel:enum PostStatus --cases="draft,published"`: enum cast on the model, `Rule::enum()` in the requests, enum type in the DTO, `statusOptions` (`options()` of `HasOptions`) in the form and `label()` in the list.
 
+With `--tenant=organization_id` (see `kernel:tenant`, run automatically when missing), the records are isolated per tenant:
+
+- the migration starts with `foreignId('organization_id')->constrained()`, and unique fields become unique per tenant (`unique(['organization_id', 'code'])`);
+- the model uses `BelongsToOrganization`: the column is filled from the current tenant, never from the form, and a record of another tenant answers 404;
+- the requests check `unique` (and `exists` for a related model that is itself isolated) within the current tenant;
+- the factory takes the current tenant, or creates one; the tests act as a user of a tenant and check that the records of another tenant are neither listed nor reachable;
+- with `--policy`, the policy also checks the tenant (`kernel:policy --tenant`).
+
 Labels (`Title`, `Author`…) come from the field names: translate them. JSON fields are stored but left out of the form.
 
 ### Policy
@@ -214,6 +223,23 @@ The permissions are added to `App\Support\PermissionRegistry`, the single source
 - without registry, the command creates it, with an idempotent `RolesAndPermissionsSeeder` (`firstOrCreate`) when there is none.
 
 The separator follows the existing registry (`posts:update` or `posts.update`), or `permissions.separator`. `--no-registry` leaves the registry alone.
+
+### Tenant
+
+```bash
+php artisan kernel:inertia-crud Organization --fields=name:string   # the tenant model and its table first
+php artisan kernel:tenant                                           # Organization, organization_id
+php artisan kernel:tenant Church --column=church_id
+```
+
+Generates the row-level tenancy:
+
+- `App\Tenancy\TenantManager`: the current tenant, which is the authenticated user's (`users.organization_id`) unless set with `initialize()`; outside a request (command, job, seeder) there is none, and `runFor($organization, fn () => ...)` acts on behalf of a tenant;
+- `App\Models\Concerns\BelongsToOrganization`: a global scope that fails closed (no current tenant, no row), the column filled on creation (an exception without tenant rather than an orphan row), the `organization()` relation and `withoutTenantScope()` to read across tenants on purpose;
+- the `scoped` binding of the manager in `AppServiceProvider::register()`;
+- a migration adding a nullable `organization_id` to `users`, once the tenants table has its migration (run the command again otherwise; `--no-user-column` to skip).
+
+Existing files are kept (`--force` to replace them).
 
 ## Fields
 
@@ -246,6 +272,7 @@ php artisan vendor:publish --tag=kernel-config
 | `inertia.flash` | `'success'` | Flash key; `'toast'` gives `->with('toast', ['type' => 'success', 'message' => …])` |
 | `inertia.per_page` | `20` | Page size of the list |
 | `inertia.policy` | `false` | Default `--policy` of `kernel:inertia-crud` |
+| `inertia.tenant` | `null` | Default `--tenant` of `kernel:inertia-crud` (e.g. `'organization_id'`) |
 
 ## Modules
 

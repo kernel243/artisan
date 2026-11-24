@@ -1,0 +1,74 @@
+<?php
+
+namespace DummyNamespace;
+
+use Closure;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+use RuntimeException;
+
+/**
+ * Le DummyLabel courant : la seule source que lisent les modèles isolés (DummyTrait).
+ *
+ * Par défaut, c'est celui de l'utilisateur connecté (colonne DummyColumn). Hors requête
+ * (commande, job, seeder), il n'y en a pas : les modèles isolés ne rendent alors aucune ligne, et
+ * il faut passer par runFor() pour agir au nom d'un DummyLabel. Un oubli se voit comme une liste
+ * vide, pas comme une fuite entre DummyPluralLabel.
+ */
+class TenantManager
+{
+    private int|string|null $current = null;
+
+    /**
+     * Fixe le DummyLabel courant, à la place de celui de l'utilisateur connecté.
+     */
+    public function initialize(Model|int|string $tenant): void
+    {
+        $this->current = $tenant instanceof Model ? $tenant->getKey() : $tenant;
+    }
+
+    /**
+     * Revient au DummyLabel de l'utilisateur connecté (aucun hors requête).
+     */
+    public function forget(): void
+    {
+        $this->current = null;
+    }
+
+    public function id(): int|string|null
+    {
+        if ($this->current !== null) {
+            return $this->current;
+        }
+
+        $user = Auth::user();
+
+        return $user instanceof Model ? $user->getAttribute('DummyColumn') : null;
+    }
+
+    public function idOrFail(): int|string
+    {
+        return $this->id() ?? throw new RuntimeException('Aucun DummyLabel courant : hors requête, passer par runFor().');
+    }
+
+    /**
+     * Exécute $callback au nom de $tenant, puis restaure le contexte précédent, y compris si le
+     * callback lève une exception.
+     *
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $callback
+     * @return TResult
+     */
+    public function runFor(Model|int|string $tenant, Closure $callback): mixed
+    {
+        $previous = $this->current;
+        $this->initialize($tenant);
+
+        try {
+            return $callback();
+        } finally {
+            $this->current = $previous;
+        }
+    }
+}
