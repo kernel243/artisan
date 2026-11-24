@@ -1,0 +1,10 @@
+it('isole les DummyLowerLabel de chaque DummyTenantLabel', function () {
+    $other = DummyModel::factory()->create(['DummyTenantColumn' => DummyTenantModel::factory()->create()->getKey()]);
+
+    $this->get(route('DummyRoutePrefix.index'))
+        ->assertInertia(fn (Assert $page) => $page->has('DummyPluralVariable.data', 0));
+
+    $this->get(route('DummyRoutePrefix.edit', $other))->assertNotFound();
+    $this->delete(route('DummyRoutePrefix.destroy', $other))->assertNotFound();
+});
+

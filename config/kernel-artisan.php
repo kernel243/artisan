@@ -54,6 +54,9 @@ return [
 
         // Generate the policy and authorize every action by default (--policy). Needs spatie/laravel-permission.
         'policy' => false,
+
+        // Tenant column of every CRUD (e.g. 'organization_id'), as --tenant: see kernel:tenant.
+        'tenant' => null,
     ],
 
 ];

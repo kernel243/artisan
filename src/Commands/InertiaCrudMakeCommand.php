@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Kernel243\Artisan\Commands\Concerns\InteractsWithFields;
 use Kernel243\Artisan\Commands\Concerns\InteractsWithPermissions;
+use Kernel243\Artisan\Commands\Concerns\InteractsWithTenancy;
 use Spatie\LaravelData\Data;
 
 /**
@@ -15,11 +16,13 @@ use Spatie\LaravelData\Data;
  * named routes, Index / Form pages using Wayfinder, and Pest tests.
  *
  * @phpstan-import-type Field from InteractsWithFields
+ * @phpstan-import-type Tenancy from InteractsWithTenancy
  */
 class InertiaCrudMakeCommand extends BaseCommand
 {
     use InteractsWithFields;
     use InteractsWithPermissions;
+    use InteractsWithTenancy;
 
     /**
      * Fields typed as text in the list: too long for a table cell.
@@ -29,6 +32,7 @@ class InertiaCrudMakeCommand extends BaseCommand
     protected $signature = 'kernel:inertia-crud {name : The model name (e.g. Post)}
                             {--fields= : Comma-separated fields, e.g. "title:string,email:email:unique,bio:text?,author_id:foreignId"}
                             {--zone= : Area of the application (e.g. admin): Http/Controllers/Admin, pages admin/..., routes admin.*}
+                            {--tenant= : Isolate the records per tenant column (e.g. organization_id), see kernel:tenant}
                             {--policy : Also generate the policy and its permissions (kernel:policy), and authorize every action}
                             {--no-tests : Do not generate the Pest tests}
                             {--no-format : Do not run Pint and Prettier on the generated files}
@@ -52,6 +56,11 @@ class InertiaCrudMakeCommand extends BaseCommand
      */
     protected array $fields;
 
+    /**
+     * @var Tenancy|null
+     */
+    protected ?array $tenant = null;
+
     public function handle(): int
     {
         try {
@@ -59,7 +68,12 @@ class InertiaCrudMakeCommand extends BaseCommand
             $this->names = $this->names($model);
             $this->zone = $this->zone($this->option('zone') ?: $this->laravel['config']->get('kernel-artisan.inertia.zone'));
             $modelClass = $this->rootNamespace().'\\Models\\'.$model;
-            $this->fields = $this->resolveFields($this->option('fields'), $this->option('fields') ? null : $modelClass);
+            $this->tenant = $this->tenancy($this->option('tenant') ?: $this->laravel['config']->get('kernel-artisan.inertia.tenant'));
+            // The tenant column is filled from the current tenant, never from the form.
+            $this->fields = array_values(array_filter(
+                $this->resolveFields($this->option('fields'), $this->option('fields') ? null : $modelClass),
+                fn (array $field) => $field['name'] !== ($this->tenant['column'] ?? null),
+            ));
         } catch (InvalidArgumentException $e) {
             $this->error($e->getMessage());
 
@@ -74,6 +88,14 @@ class InertiaCrudMakeCommand extends BaseCommand
 
         if (! class_exists('Inertia\\Inertia')) {
             $this->warn('inertiajs/inertia-laravel is not installed: composer require inertiajs/inertia-laravel');
+        }
+
+        if ($this->tenant !== null && ! $this->tenancyInstalled($this->tenant)) {
+            $this->call('kernel:tenant', array_filter([
+                'model' => $this->tenant['model'],
+                '--column' => $this->tenant['column'],
+                '--dry-run' => $this->isDryRun(),
+            ]));
         }
 
         $this->generateMigration();
@@ -177,6 +199,17 @@ class InertiaCrudMakeCommand extends BaseCommand
 
         $columns = array_map(fn (array $field) => '            '.$this->migrationColumn($field).';', $this->fields);
 
+        if ($this->tenant !== null) {
+            array_unshift($columns, "            \$table->foreignId('{$this->tenant['column']}')->constrained()->cascadeOnDelete();");
+
+            // A value is unique within its tenant: two tenants may use the same one.
+            foreach ($this->fields as $field) {
+                if ($field['unique']) {
+                    $columns[] = "            \$table->unique(['{$this->tenant['column']}', '{$field['name']}']);";
+                }
+            }
+        }
+
         $this->generate($directory.'/'.date('Y_m_d_His').'_create_'.$this->names['table'].'_table.php', $this->render($this->getStubContent('inertia.migration'), [
             'DummyTable' => $this->names['table'],
             'DummyLabel' => Str::lower($this->names['label']),
@@ -218,7 +251,9 @@ class InertiaCrudMakeCommand extends BaseCommand
             default => "string('{$name}')",
         };
 
-        return '$table->'.$column.($field['nullable'] ? '->nullable()' : '').($field['unique'] ? '->unique()' : '');
+        $unique = $field['unique'] && $this->tenant === null ? '->unique()' : '';
+
+        return '$table->'.$column.($field['nullable'] ? '->nullable()' : '').$unique;
     }
 
     protected function generateModel(): void
@@ -253,6 +288,10 @@ class InertiaCrudMakeCommand extends BaseCommand
                     '    }',
                 ]);
             }
+        }
+
+        if ($this->tenant !== null) {
+            $imports[] = $this->tenant['traitClass'];
         }
 
         $imports = array_values(array_unique($imports));
@@ -295,6 +334,11 @@ class InertiaCrudMakeCommand extends BaseCommand
             'DummyCasts' => $casts === [] ? '            //' : implode("\n", $casts),
         ]);
 
+        if ($this->tenant !== null) {
+            // Traits in alphabetical order, as Pint does.
+            $content = str_replace('    /** @use HasFactory', "    use {$this->tenant['trait']};\n\n    /** @use HasFactory", $content);
+        }
+
         if ($hidden === []) {
             $content = preg_replace('/\n    \/\*\*\n     \* Les attributs masqués.*?protected \$hidden = \[\n\n    \];\n/s', '', $content);
         }
@@ -307,6 +351,13 @@ class InertiaCrudMakeCommand extends BaseCommand
         $model = $this->names['model'];
         $definitions = array_map(fn (array $field) => "            '{$field['name']}' => ".$this->fakeValue($field).',', $this->fields);
         $imports = [$this->rootNamespace().'\\Models\\'.$model, 'Illuminate\\Database\\Eloquent\\Factories\\Factory'];
+
+        if ($this->tenant !== null) {
+            // The current tenant when there is one (tests acting as a user), a new tenant otherwise.
+            array_unshift($definitions, "            '{$this->tenant['column']}' => fn () => app(TenantManager::class)->id() ?? {$this->tenant['model']}::factory(),");
+            $imports[] = $this->tenant['class'];
+            $imports[] = $this->tenant['manager'];
+        }
 
         foreach ($this->fields as $field) {
             if ($field['type'] === 'foreignid') {
@@ -520,16 +571,17 @@ class InertiaCrudMakeCommand extends BaseCommand
     {
         $model = $this->names['model'];
         $common = array_filter(['--force' => $this->isForced(), '--dry-run' => $this->isDryRun()]);
-        $fields = array_filter(['--fields' => $this->option('fields')]);
+        $fields = $this->option('fields') ? ['--fields' => $this->fieldsOption()] : [];
+        $tenant = $this->tenant !== null ? ['--tenant' => $this->tenant['column']] : [];
 
         if ($this->usesData()) {
             $this->call('kernel:data', ['name' => Str::plural($model).'/'.$model.'Data', ...$fields, ...$common]);
         }
 
-        $this->call('kernel:request', ['model' => $model, ...$fields, ...$common]);
+        $this->call('kernel:request', ['model' => $model, ...$fields, ...$tenant, ...$common]);
 
         if ($this->usesPolicy()) {
-            $this->call('kernel:policy', ['model' => $model, ...$common]);
+            $this->call('kernel:policy', ['model' => $model, ...$tenant, ...$common]);
         }
 
         foreach (['Create', 'Update', 'Delete'] as $verb) {
@@ -540,6 +592,19 @@ class InertiaCrudMakeCommand extends BaseCommand
                 ...$common,
             ]));
         }
+    }
+
+    /**
+     * The fields given to the sub-generators, without the tenant column.
+     */
+    protected function fieldsOption(): string
+    {
+        return implode(',', array_map(fn (array $field) => implode(':', array_filter([
+            $field['name'],
+            $field['type'],
+            $field['nullable'] ? 'nullable' : null,
+            $field['unique'] ? 'unique' : null,
+        ])), $this->fields));
     }
 
     protected function generateController(): void
@@ -808,7 +873,7 @@ class InertiaCrudMakeCommand extends BaseCommand
             }
         }
 
-        [$routes, $controller] = $this->importInRoutes($routes, $controllerClass);
+        [$routes, $controller] = $this->importClass($routes, $controllerClass);
         $resource = "Route::resource('{$this->names['kebab']}', {$controller}::class)->except('show');";
 
         $group = match (true) {
@@ -828,46 +893,6 @@ class InertiaCrudMakeCommand extends BaseCommand
 
         file_put_contents($routesPath, rtrim($routes)."\n\n".$block);
         $this->info("Routes added to {$file}");
-    }
-
-    /**
-     * Import the controller at the top of the routes file, in alphabetical order (as Pint does).
-     * Falls back to the fully qualified name when another class already uses the short name.
-     *
-     * @return array{0: string, 1: string}
-     */
-    protected function importInRoutes(string $routes, string $class): array
-    {
-        $short = class_basename($class);
-
-        if (str_contains($routes, "use {$class};")) {
-            return [$routes, $short];
-        }
-
-        if (preg_match('/^use [^;]*(\\\\| as )'.preg_quote($short, '/').';$/m', $routes)) {
-            return [$routes, '\\'.$class];
-        }
-
-        preg_match_all('/^use [^;]+;$/m', $routes, $matches, PREG_OFFSET_CAPTURE);
-
-        if ($matches[0] === []) {
-            return [preg_replace('/^<\?php\s*/', "<?php\n\nuse {$class};\n\n", $routes, 1), $short];
-        }
-
-        $first = $matches[0][0][1];
-        $last = end($matches[0]);
-        $end = $last[1] + strlen($last[0]);
-        $block = substr($routes, $first, $end - $first);
-
-        // Only reorder a block made of imports alone.
-        if (preg_match('/^(use [^;]+;\n)*use [^;]+;$/', $block)) {
-            $imports = [...explode("\n", $block), "use {$class};"];
-            usort($imports, fn (string $a, string $b) => strcasecmp(rtrim($a, ';'), rtrim($b, ';')));
-
-            return [substr($routes, 0, $first).implode("\n", $imports).substr($routes, $end), $short];
-        }
-
-        return [substr($routes, 0, $end)."\nuse {$class};".substr($routes, $end), $short];
     }
 
     // Front end
@@ -1168,6 +1193,10 @@ class InertiaCrudMakeCommand extends BaseCommand
             $imports[] = 'Spatie\\Permission\\Models\\Permission';
         }
 
+        if ($this->tenant !== null) {
+            $imports[] = $this->tenant['class'];
+        }
+
         $imports = array_values(array_unique($imports));
         sort($imports);
 
@@ -1190,6 +1219,15 @@ class InertiaCrudMakeCommand extends BaseCommand
             ? $this->render($this->getStubContent('inertia.test.forbidden'), $replacements)
             : '';
 
+        $replacements['DummyTenantTest'] = $this->tenant !== null
+            ? $this->render($this->getStubContent('inertia.test.tenant'), [
+                ...$replacements,
+                'DummyTenantModel' => $this->tenant['model'],
+                'DummyTenantColumn' => $this->tenant['column'],
+                'DummyTenantLabel' => $this->tenant['label'],
+            ])
+            : '';
+
         $replacements['DummyEmptyTest'] = $this->hasRequiredField()
             ? $this->render($this->getStubContent('inertia.test.empty'), $replacements)
             : '';
@@ -1204,8 +1242,13 @@ class InertiaCrudMakeCommand extends BaseCommand
      */
     protected function actingAs(): string
     {
+        // A user of a tenant: the records the tests create belong to it.
+        $user = $this->tenant !== null
+            ? "User::factory()->create(['{$this->tenant['column']}' => {$this->tenant['model']}::factory()->create()->getKey()])"
+            : 'User::factory()->create()';
+
         if (! $this->usesPolicy()) {
-            return '    $this->actingAs(User::factory()->create());';
+            return "    \$this->actingAs({$user});";
         }
 
         $permissions = array_map(
@@ -1220,7 +1263,7 @@ class InertiaCrudMakeCommand extends BaseCommand
             "        Permission::findOrCreate(\$permission, 'web');",
             '    }',
             '',
-            '    $this->actingAs(User::factory()->create()->givePermissionTo($permissions));',
+            "    \$this->actingAs({$user}->givePermissionTo(\$permissions));",
         ]);
     }
 
