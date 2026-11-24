@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Rattache chaque utilisateur à son DummyLabel : c'est le DummyLabel courant de ses requêtes
+ * (TenantManager). Nullable pour les comptes de plateforme, qui ne voient alors aucune donnée
+ * isolée.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('DummyUsersTable', function (Blueprint $table) {
+            $table->foreignId('DummyColumn')->nullable()->after('id')->constrained('DummyTenantTable')->nullOnDelete();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('DummyUsersTable', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('DummyColumn');
+        });
+    }
+};

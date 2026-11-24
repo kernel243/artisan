@@ -251,4 +251,44 @@ abstract class BaseCommand extends Command
     {
         return class_basename($fqcn);
     }
+
+    /**
+     * Import a class at the top of a PHP file, in alphabetical order (as Pint does).
+     * Falls back to the fully qualified name when another class already uses the short name.
+     *
+     * @return array{0: string, 1: string}
+     */
+    protected function importClass(string $routes, string $class): array
+    {
+        $short = class_basename($class);
+
+        if (str_contains($routes, "use {$class};")) {
+            return [$routes, $short];
+        }
+
+        if (preg_match('/^use [^;]*(\\\\| as )'.preg_quote($short, '/').';$/m', $routes)) {
+            return [$routes, '\\'.$class];
+        }
+
+        preg_match_all('/^use [^;]+;$/m', $routes, $matches, PREG_OFFSET_CAPTURE);
+
+        if ($matches[0] === []) {
+            return [preg_replace('/^<\?php\s*/', "<?php\n\nuse {$class};\n\n", $routes, 1), $short];
+        }
+
+        $first = $matches[0][0][1];
+        $last = end($matches[0]);
+        $end = $last[1] + strlen($last[0]);
+        $block = substr($routes, $first, $end - $first);
+
+        // Only reorder a block made of imports alone.
+        if (preg_match('/^(use [^;]+;\n)*use [^;]+;$/', $block)) {
+            $imports = [...explode("\n", $block), "use {$class};"];
+            usort($imports, fn (string $a, string $b) => strcasecmp(rtrim($a, ';'), rtrim($b, ';')));
+
+            return [substr($routes, 0, $first).implode("\n", $imports).substr($routes, $end), $short];
+        }
+
+        return [substr($routes, 0, $end)."\nuse {$class};".substr($routes, $end), $short];
+    }
 }

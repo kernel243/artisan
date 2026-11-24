@@ -1,0 +1,59 @@
+<?php
+
+namespace DummyNamespace;
+
+DummyImports
+
+/**
+ * Isolation par ligne sur DummyColumn.
+ *
+ * Le scope échoue fermé : sans DummyLabel courant (TenantManager), la requête ne rend rien.
+ * Lire au-delà de son DummyLabel se fait par withoutTenantScope(), écrit en toutes lettres là où
+ * c'est voulu, jamais par défaut. Les liaisons de route passent par ce scope : un enregistrement
+ * d'un autre DummyLabel répond 404.
+ *
+ * À la création, DummyColumn est pris du DummyLabel courant ; sans lui, la création lève une
+ * exception plutôt que d'écrire une ligne orpheline qu'aucun DummyLabel ne verrait.
+ */
+trait DummyTrait
+{
+    public static function bootDummyTrait(): void
+    {
+        static::creating(function (Model $model): void {
+            if (blank($model->getAttribute('DummyColumn'))) {
+                $model->setAttribute('DummyColumn', app(TenantManager::class)->idOrFail());
+            }
+        });
+
+        static::addGlobalScope('tenant', function (Builder $query): void {
+            $id = app(TenantManager::class)->id();
+
+            if ($id === null) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query->where($query->qualifyColumn('DummyColumn'), $id);
+        });
+    }
+
+    /**
+     * @return BelongsTo<DummyTenant, $this>
+     */
+    public function DummyRelation(): BelongsTo
+    {
+        return $this->belongsTo(DummyTenant::class, 'DummyColumn');
+    }
+
+    /**
+     * Lève l'isolation, pour un traitement qui couvre volontairement tous les DummyPluralLabel.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeWithoutTenantScope(Builder $query): Builder
+    {
+        return $query->withoutGlobalScope('tenant');
+    }
+}
